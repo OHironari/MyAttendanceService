@@ -2,6 +2,9 @@ from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string, get_column_letter
 from datetime import datetime,date,time
 import re
+from get_excel_info_from_s3 import load_file_from_s3
+from dotenv import load_dotenv
+import os
 
 class workrecord:
     def __init__(self, work_date=None, start_time=None, end_time=None):
@@ -26,7 +29,6 @@ def main(work_record):
     # WorkBookの読み込み
     wb = load_workbook("../attendance_202506.xlsx",data_only=True)
     ws = wb.active
-    # input_time={"date": date,"starttime": input_starttime,"endtime": input_endtime}
 
     search_range = ws["B8:B38"]
 
@@ -50,7 +52,12 @@ def main(work_record):
                 wb.save('test.xlsx')
     return 
 
+
+
 if __name__ == "__main__":
+    # .envを読み込む
+    load_dotenv()
+    bucket_name=os.getenv("bucket_name")
     input_time={}
     input_starttime=input('starttime(hh:mm):')
     input_endtime=input('endtime(hh:mm):')
@@ -61,7 +68,6 @@ if __name__ == "__main__":
         start_time=input_starttime,
         end_time=input_endtime
     )
-    
-    main(work_record)
-
+    if (load_file_from_s3(bucket_name)):
+        main(work_record)
 
