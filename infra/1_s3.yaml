@@ -1,0 +1,39 @@
+Resources:
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: my-attendance-service-ononari1
+      PublicAccessBlockConfiguration:
+                BlockPublicAcls: true
+                BlockPublicPolicy: true
+                IgnorePublicAcls: true
+                RestrictPublicBuckets: true
+      WebsiteConfiguration:
+        IndexDocument: myapp_index.html 
+        RoutingRules:
+          - RoutingRuleCondition:
+              HttpErrorCodeReturnedEquals: '404'
+              KeyPrefixEquals: out1/
+            RedirectRule:
+              HostName: ec2-11-22-333-44.compute-1.amazonaws.com
+              ReplaceKeyPrefixWith: report-404/
+
+
+Outputs:
+  S3BucketARN:
+    Value: !GetAtt S3Bucket.Arn
+    Description: My S3 Bucket ARN
+    Export:
+      Name: S3BucketARN
+  
+  S3BucketName:
+    Value: !Ref S3Bucket
+    Description: This is the name of bucket
+    Export:
+      Name: S3BucketName
+
+  S3BucketDomainName:
+    Value: !GetAtt S3Bucket.DomainName
+    Description: This is the domain name for s3
+    Export:
+      Name: S3BucketDomainName

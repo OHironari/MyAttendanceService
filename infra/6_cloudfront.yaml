@@ -1,0 +1,125 @@
+Parameters:
+  ACMCertificateArn:
+    Type: String
+    Description: Please into ACM Certification from us-east-1
+  MyappDomainName:
+    Type: String
+    Description: Please input domain name that you want to alternate cloud front domain name
+    Default: app.itononari.xyz
+  MyApiDomainName:
+    Type: String
+    Description: Please input domain name that you want to alternate api domain name
+    Default: api.itononari.xyz
+
+Resources:
+  # すまないがここでバケットポリシーの追加をさせてもらう
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !ImportValue S3BucketName
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: 
+              - !Join 
+                  - ""
+                  - 
+                    - !ImportValue S3BucketARN
+                    - "/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  CloudFrontOAC1:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: MyOAC1
+        Description: Origin Access Control for CloudFront to S3
+        SigningProtocol: sigv4
+        SigningBehavior: always
+        OriginAccessControlOriginType: s3
+
+  MyCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig: 
+        Name: MyCustomCachePolicy
+        DefaultTTL: 300            # デフォルト 5分
+        MinTTL: 0                  # 最小 0秒（オリジンから取得し直せる）
+        MaxTTL: 3600               # 最大 1時間（キャッシュが生きる最長時間）
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          HeadersConfig:
+            HeaderBehavior: none
+          CookiesConfig:
+            CookieBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Aliases: 
+          - !Ref MyappDomainName
+        DefaultRootObject: myapp_index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !ImportValue S3BucketDomainName
+            OriginAccessControlId: !Ref CloudFrontOAC1
+            S3OriginConfig: {}
+
+          - Id: APIOrigin
+            DomainName: !Ref MyApiDomainName
+            CustomOriginConfig: 
+              OriginProtocolPolicy: https-only  # API Gateway は HTTPS 前提
+              OriginSSLProtocols:
+                - TLSv1.2
+
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: !Ref MyCachePolicy
+
+        CacheBehaviors:
+          - PathPattern: /submit*
+            TargetOriginId: APIOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - POST
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            CachePolicyId: !Ref MyCachePolicy
+
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+
+Outputs:
+  CloudfrontDomainName:
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Description: This is the Cloud Front Domain Name
+    Export:
+      Name: CloudfrontDomainName

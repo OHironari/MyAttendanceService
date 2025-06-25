@@ -1,0 +1,32 @@
+Parameters:
+  SecretsManagerARN:
+    Type: String
+    Description: Into Secret Manager ARN. You have this one at us-east-1.
+
+Resources:
+  PostFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MyAttendanceFunction
+      Description: "This define the Lambda Function for post method"
+      Code:
+        S3Bucket: !ImportValue S3BucketName
+        S3Key: lambda_function.py.zip
+      Environment:
+        Variables:
+          bucket_name: !ImportValue S3BucketName
+          secrets_manager_arn: !Ref SecretsManagerARN
+      Role: !ImportValue LambdaRole
+      Runtime: "python3.13"
+      Handler: lambda_function.lambda_handler
+      Timeout: 10
+      Layers:
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:openpyxl-utils:1
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:openpyxl:3
+        
+Outputs:
+  FunctionARN:
+    Value: !GetAtt PostFunction.Arn
+    Description: Return Function arn
+    Export:
+      Name: FunctionARN

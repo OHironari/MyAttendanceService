@@ -1,5 +1,4 @@
 import boto3
-import pandas as pd
 import io
 import os
 
@@ -7,18 +6,17 @@ def load_file_from_s3(bucketname):
     try:
         # S3設定
         bucket_name = bucketname
-        object_key = 'test.xlsx'
+        object_key = 'attendance_202506.xlsx'
         current_dir = os.getcwd()  # 現在の作業ディレクトリ
         local_file = os.path.join(current_dir, 'test.xlsx')
 
         # S3クライアント作成
         s3 = boto3.client('s3')
-        s3.download_file(bucket_name, object_key, local_file)
+        # 1️⃣ S3からファイルをダウンロード（メモリ上）
+        response = s3.get_object(Bucket=bucket_name, Key=object_key)
+        excel_data = response['Body'].read()
 
-        if (os.path.exists(local_file)):
-            return True
-        else:
-            return False
+        return excel_data
     except:
         return False
 

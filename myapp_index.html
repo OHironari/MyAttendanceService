@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Attendance App</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+</head>
+<body>
+  <h1 class="form_title">Input Attendance</h1>
+  <form class="form" action="/submit" method="post">
+    <p class="form_group">
+      <label class="form_label" for="day">Day:</label>
+      <input class="input" type="date" name="work_date" id="day" value=""/>
+    </p>
+
+    <p class="form_group">
+      <label class="form_label" for="start">Start:</label>
+      <input class="input" type="time" name="start_time" id="start" value="09:00"/>
+    </p>
+    <p class="form_group">
+      <label class="form_label" for="end">End:</label>
+      <input class="input" type="time" name="end_time" id="end" value="17:30"/>
+    </p>
+    <button class="form_button" type="submit">Submit</button>
+  </form>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const formatted = `${yyyy}-${mm}-${dd}`;
+      document.getElementById('day').value = formatted;
+    });
+  </script>
+</body>
+</html>

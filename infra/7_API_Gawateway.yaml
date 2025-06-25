@@ -1,0 +1,42 @@
+
+
+Resources:
+  MyApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: MyApiGateway
+
+  MyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ParentId: !GetAtt MyApiGateway.RootResourceId
+      PathPart: submit
+
+  LambdaMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ResourceId: !Ref MyResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.myheader: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:MyFunction/invocations
+        RequestParameters:
+          integration.request.header.header1: method.request.header.myheader
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.header1: true
+            method.response.header.header2: true
+
+Outputs:
+  ApigatewayDomainName:
+    Value: !Sub "${MyApiGateway}.execute-api.${AWS::Region}.amazonaws.com"
+    Description: This is the Api Gateway Domain Name
+    Export:
+      Name: ApigatewayDomainName

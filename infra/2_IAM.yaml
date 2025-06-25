@@ -1,0 +1,114 @@
+Parameters:
+  SecretsManagerARN:
+    Type: String
+    Description: Into Secret Manager ARN. You have this one at us-east-1.
+
+Resources:
+  # For Assume Role
+  S3AccessRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !GetAtt LambdaRole.Arn
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: s3accessroleforpython
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                  - 's3:GetObject'
+                  - 's3:DeleteObject'
+                Resource:
+                  - !Join
+                      - ""
+                      - - !ImportValue S3BucketARN
+                        - "/*"
+
+  LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      
+  alloowassumerole:
+    Type: 'AWS::IAM::RolePolicy'
+    Properties:
+      PolicyName: alloowassumerole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'sts:AssumeRole'
+            Resource:
+              - !GetAtt S3AccessRole.Arn
+      RoleName: !Ref LambdaRole
+
+
+  allowaccesssecretsmanager:
+    Type: 'AWS::IAM::RolePolicy'
+    Properties:
+      PolicyName: allowaccesssecretsmanager
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'secretsmanager:GetSecretValue'
+            Resource:
+              - !Ref SecretsManagerARN
+      RoleName: !Ref LambdaRole
+
+
+      # Policies:
+      #   - PolicyName: alloowassumerole
+      #     PolicyDocument:
+      #       Version: "2012-10-17"
+      #       Statement:
+      #         - Effect: Allow
+      #           Action:
+      #             - 'sts:AssumeRole'
+      #           Resource:
+      #             - !GetAtt S3AccessRole.Arn
+      #   - PolicyName: allowaccesssecretsmanager
+      #     PolicyDocument:
+      #       Version: "2012-10-17"
+      #       Statement:
+      #         - Effect: Allow
+      #           Action:
+      #             - 'secretsmanager:GetSecretValue'
+      #           Resource:
+      #             - !Ref SecretsManagerARN
+
+
+Outputs:
+  S3AccessRole:
+    Value: !GetAtt S3AccessRole.Arn
+    Description: For S3 Access Assume IAM ROLE
+    Export:
+      Name: S3AccessRole
+  LambdaRole:
+    Value: !GetAtt LambdaRole.Arn
+    Description: For Lambda IAM ROLE
+    Export:
+      Name: LambdaRole
+
+
+
