@@ -1,22 +1,20 @@
 Parameters:
-  MyAppDomainName:
-    Type: String
-    Description: Please input domain name that you want to alternate cloud front domain name
-    Default: app.itononari.xyz
   MyApiDomainName:
     Type: String
     Description: Please input domain name that you want to alternate cloud front domain name
     Default: api.itononari.xyz
 
-Resources: 
-  MyAppCertificate: 
-    Type: "AWS::CertificateManager::Certificate"
-    Properties: 
-      DomainName: !Ref MyAppDomainName
-      ValidationMethod: DNS
 
+Resources: 
   MyApiCertificate: 
     Type: "AWS::CertificateManager::Certificate"
     Properties: 
       DomainName: !Ref MyApiDomainName
       ValidationMethod: DNS
+
+Outputs:
+  ApiDomainarn:
+    Value: !Ref MyApiCertificate
+    Description: This is the Api Gateway Domain acm arn
+    Export:
+      Name: ApiDomainarn

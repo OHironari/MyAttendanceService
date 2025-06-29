@@ -64,7 +64,7 @@ Resources:
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
-      DistributionConfig:
+       DistributionConfig:
         Enabled: true
         Aliases: 
           - !Ref MyappDomainName
@@ -72,16 +72,22 @@ Resources:
         Origins:
           - Id: S3Origin
             DomainName: !ImportValue S3BucketDomainName
+            OriginPath: "/attendance"
             OriginAccessControlId: !Ref CloudFrontOAC1
             S3OriginConfig: {}
 
           - Id: APIOrigin
             DomainName: !Ref MyApiDomainName
+            OriginPath: 
+              !Join 
+              - ""
+              - - "/"
+                - !ImportValue StageName
             CustomOriginConfig: 
               OriginProtocolPolicy: https-only  # API Gateway は HTTPS 前提
               OriginSSLProtocols:
                 - TLSv1.2
-
+            
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
@@ -93,6 +99,10 @@ Resources:
             - HEAD
           Compress: true
           CachePolicyId: !Ref MyCachePolicy
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !Ref CloudFrontFunction
+
 
         CacheBehaviors:
           - PathPattern: /submit*
@@ -116,6 +126,29 @@ Resources:
           AcmCertificateArn: !Ref ACMCertificateArn
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
+
+  CloudFrontFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: MyFunctionName
+      FunctionConfig:
+        Comment: A basic CloudFront function
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+            
+          if (uri.endsWith('/')) {
+            request.uri += 'myapp_index.html';
+          } else if (!uri.includes('.')) {
+            request.uri += '/myapp_index.html';
+          }
+
+          return request;
+        }
+      AutoPublish: true
+
 
 Outputs:
   CloudfrontDomainName:

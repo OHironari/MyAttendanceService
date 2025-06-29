@@ -22,6 +22,7 @@ Resources:
       TTL: 300
       ResourceRecords:
         - !ImportValue CloudfrontDomainName
+
   MyApiCnameRecord:
     Type: AWS::Route53::RecordSet
     Properties:

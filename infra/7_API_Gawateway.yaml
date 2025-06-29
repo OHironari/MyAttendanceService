@@ -1,4 +1,8 @@
-
+Parameters:
+  MyApiDomainName:
+    Type: String
+    Description: Please input domain name that you want to alternate api domain name
+    Default: api.itononari.xyz
 
 Resources:
   MyApiGateway:
@@ -25,7 +29,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:MyFunction/invocations
+        Uri:
+          !Join
+            - ''
+            - - !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/"
+              - !ImportValue FunctionARN
+              - "/invocations"
         RequestParameters:
           integration.request.header.header1: method.request.header.myheader
       MethodResponses:
@@ -33,6 +42,45 @@ Resources:
           ResponseParameters:
             method.response.header.header1: true
             method.response.header.header2: true
+  
+  MyDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref MyApiDomainName
+      RegionalCertificateArn: !ImportValue ApiDomainarn
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  MyMapping:
+    Type: 'AWS::ApiGateway::BasePathMapping'
+    DependsOn: MyStage
+    Properties:
+      Stage: myapi
+      DomainName: !Ref MyDomainName
+      RestApiId: !Ref MyApiGateway
+
+  MyDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: LambdaMethod
+    Properties:
+      RestApiId: !Ref MyApiGateway
+
+  MyStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: myapi
+      RestApiId: !Ref MyApiGateway
+      DeploymentId: !Ref MyDeployment
+      MethodSettings:
+        - LoggingLevel: INFO
+          ResourcePath: "/*"
+          HttpMethod: "*"
+          MetricsEnabled: true
+          DataTraceEnabled: true
+      AccessLogSetting:
+        DestinationArn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/apigateway/access-logs"
+        Format: '{ "requestId":"$context.requestId", "ip":"$context.identity.sourceIp", "userAgent":"$context.identity.userAgent", ... }'
 
 Outputs:
   ApigatewayDomainName:
@@ -40,3 +88,10 @@ Outputs:
     Description: This is the Api Gateway Domain Name
     Export:
       Name: ApigatewayDomainName
+  StageName:
+    Value: !Ref MyStage
+    Description: This is the Api Gateway stage name
+    Export: 
+      Name: StageName
+
+

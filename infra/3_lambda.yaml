@@ -23,7 +23,13 @@ Resources:
       Layers:
         - arn:aws:lambda:ap-northeast-1:324037284373:layer:openpyxl-utils:1
         - arn:aws:lambda:ap-northeast-1:324037284373:layer:openpyxl:3
-        
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PostFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      
 Outputs:
   FunctionARN:
     Value: !GetAtt PostFunction.Arn

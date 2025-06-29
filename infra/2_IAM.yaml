@@ -46,7 +46,7 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-      
+    
   alloowassumerole:
     Type: 'AWS::IAM::RolePolicy'
     Properties:
@@ -75,6 +75,32 @@ Resources:
             Resource:
               - !Ref SecretsManagerARN
       RoleName: !Ref LambdaRole
+
+  ApiGatewayToCloudWatchRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Service: apigateway.amazonaws.com
+        Action: sts:AssumeRole
+
+  allowaccessscloudwatch:
+    Type: 'AWS::IAM::RolePolicy'
+    Properties:
+      PolicyName: allowaccesssecretsmanager
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+            - 'logs:CreateLogGroup'
+            - 'logs:CreateLogStream'
+            - 'logs:PutLogEvents'
+            Resource:
+              - '*'
+      RoleName: !Ref ApiGatewayToCloudWatchRole
 
 
       # Policies:
@@ -109,6 +135,10 @@ Outputs:
     Description: For Lambda IAM ROLE
     Export:
       Name: LambdaRole
-
+  ApiGatewayToCloudWatchRole:
+    Value: !GetAtt ApiGatewayToCloudWatchRole.Arn
+    Description: for api gateway IAM ROLE
+    Export:
+      Name: ApiGatewayToCloudWatchRole
 
 
