@@ -73,7 +73,7 @@ Resources:
       RestApiId: !Ref MyApiGateway
       DeploymentId: !Ref MyDeployment
       MethodSettings:
-        - LoggingLevel: INFO
+        - LoggingLevel: INFO,ERROR
           ResourcePath: "/*"
           HttpMethod: "*"
           MetricsEnabled: true
@@ -81,6 +81,8 @@ Resources:
       AccessLogSetting:
         DestinationArn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/apigateway/access-logs"
         Format: '{ "requestId":"$context.requestId", "ip":"$context.identity.sourceIp", "userAgent":"$context.identity.userAgent", ... }'
+
+
 
 Outputs:
   ApigatewayDomainName:

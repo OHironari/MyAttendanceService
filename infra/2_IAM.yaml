@@ -81,15 +81,15 @@ Resources:
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
-    Statement:
-      - Effect: Allow
-        Service: apigateway.amazonaws.com
-        Action: sts:AssumeRole
+        Statement:
+          - Effect: Allow
+            Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
 
   allowaccessscloudwatch:
     Type: 'AWS::IAM::RolePolicy'
     Properties:
-      PolicyName: allowaccesssecretsmanager
+      PolicyName: allowaccesscloudwatch
       PolicyDocument:
         Version: "2012-10-17"
         Statement:

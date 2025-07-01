@@ -20,12 +20,14 @@ secrets_value_for_iam_role = os.getenv("secrets_value_for_iam_role")
 
 def lambda_handler(event, context):
     try:
-        # 将来的にはここにapiからの値を入れる
+        body = json.loads(event["body"])
         work_record = workrecord(
-            work_date=None,
-            start_time=None,
-            end_time=None
+            work_date=body["work_date"],
+            start_time=body["start_time"],
+            end_time=body["end_time"]
         )
+        logger.info(f"work_record:{work_record}")
+
         # get assume role arn from secrets manager
         role_arn = get_role_arn()
         if role_arn is None or isinstance(role_arn, dict):
@@ -61,7 +63,7 @@ def get_role(role_arn):
         response = sts.assume_role(
             RoleArn=role_arn,
             RoleSessionName="accessS3",
-            DurationSecond=900
+            #DurationSecond=900
             
         )
         session = boto3.Session(aws_access_key_id=response['Credentials']['AccessKeyId'],
@@ -76,7 +78,7 @@ def main_logic(event,session,work_record):
     try:
         # S3 client
         s3_client = session.client('s3')
-        object_key = 'attendance_202506.xlsx'
+        object_key = 'attendance_202507.xlsx'
         logger.info(f"対象ファイル: s3://{bucket_name}/{object_key}")
 
         # 1️⃣ S3からファイルをダウンロード（メモリ上）
@@ -149,5 +151,12 @@ class workrecord:
             self.end_time = datetime.strptime(end_time, "%H:%M").time()
         else:
             self.end_time = time(17, 30)  # 17:30
+    
     def __str__(self):
-        return f"{self.work_date} | {self.start_time} - {self.end_time} 時間"
+        date_str = self.work_date.strftime("%Y-%m-%d")
+        start_str = self.start_time.strftime("%H:%M")
+        end_str = self.end_time.strftime("%H:%M")
+        return f"{date_str} | {start_str} - {end_str}"
+
+# curl https://app.itononari.xyz/submit -XPOST -H "Content-Type: application/json" -d '{"work_date":"2025-07-03", "start_time":"09:00", "end_time":"18:15"}'
+

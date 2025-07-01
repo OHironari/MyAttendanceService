@@ -6,10 +6,6 @@ Parameters:
     Type: String
     Description: Please input domain name that you want to alternate cloud front domain name
     Default: app.itononari.xyz
-  MyApiDomainName:
-    Type: String
-    Description: Please input domain name that you want to alternate api domain name
-    Default: api.itononari.xyz
 
 Resources:
   # すまないがここでバケットポリシーの追加をさせてもらう
@@ -77,7 +73,7 @@ Resources:
             S3OriginConfig: {}
 
           - Id: APIOrigin
-            DomainName: !Ref MyApiDomainName
+            DomainName: !ImportValue ApigatewayDomainName
             OriginPath: 
               !Join 
               - ""

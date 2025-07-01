@@ -32,32 +32,6 @@ def main(work_record,wb):
     # wb = load_workbook("../attendance_202506.xlsx",data_only=True)
     df = pd.read_excel(io.BytesIO(wb))
 
-    
-
-    # search_range = ws["B8:B38"]
-
-    # for row in search_range:
-    #     for cell in row:
-    #         if ws[cell.coordinate].value.strftime("%Y-%m-%d") == work_record.work_date.strftime("%Y-%m-%d") :
-
-    #             #行番号の取得
-    #             col_letters, row = re.match(r"([A-Z]+)(\d+)", cell.coordinate).groups()
-
-    #             # 列文字 → 列番号
-    #             col_num = column_index_from_string(col_letters)
-    #             row = int(row)
-
-    #             start_time_cell = f"{get_column_letter(col_num + 3)}{row}"
-    #             end_time_cell=f"{get_column_letter(col_num + 4)}{row}"
-
-    #             ws[start_time_cell].value=work_record.start_time
-    #             ws[end_time_cell].value=work_record.end_time
-
-    #             wb.save('test.xlsx')
-    # return 
-
-
-
 if __name__ == "__main__":
     # .envを読み込む
     load_dotenv()
