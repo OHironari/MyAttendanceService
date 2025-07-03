@@ -39,11 +39,31 @@ Resources:
         SigningBehavior: always
         OriginAccessControlOriginType: s3
 
-  MyCachePolicy:
+  PostCachePolicy:
     Type: AWS::CloudFront::CachePolicy
     Properties:
       CachePolicyConfig: 
-        Name: MyCustomCachePolicy
+        Name: PostCachePolicy
+        DefaultTTL: 300            # デフォルト 5分
+        MinTTL: 0                  # 最小 0秒（オリジンから取得し直せる）
+        MaxTTL: 3600               # 最大 1時間（キャッシュが生きる最長時間）
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          HeadersConfig:
+            HeaderBehavior: whitelist
+            Headers:
+              - Content-Type
+          CookiesConfig:
+            CookieBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  GetCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig: 
+        Name: GetCachePolicy
         DefaultTTL: 300            # デフォルト 5分
         MinTTL: 0                  # 最小 0秒（オリジンから取得し直せる）
         MaxTTL: 3600               # 最大 1時間（キャッシュが生きる最長時間）
@@ -56,6 +76,7 @@ Resources:
             CookieBehavior: none
           QueryStringsConfig:
             QueryStringBehavior: none
+
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -94,7 +115,7 @@ Resources:
             - GET
             - HEAD
           Compress: true
-          CachePolicyId: !Ref MyCachePolicy
+          CachePolicyId: !Ref GetCachePolicy
           FunctionAssociations:
             - EventType: viewer-request
               FunctionARN: !Ref CloudFrontFunction
@@ -116,7 +137,7 @@ Resources:
               - GET
               - HEAD
             Compress: true
-            CachePolicyId: !Ref MyCachePolicy
+            CachePolicyId: !Ref PostCachePolicy
 
         ViewerCertificate:
           AcmCertificateArn: !Ref ACMCertificateArn

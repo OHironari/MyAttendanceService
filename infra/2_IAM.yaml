@@ -77,52 +77,45 @@ Resources:
       RoleName: !Ref LambdaRole
 
   ApiGatewayToCloudWatchRole:
-    Type: 'AWS::IAM::Role'
+    Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: 2012-10-17
         Statement:
-          - Effect: Allow
+          Effect: Allow
+          Principal:
             Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
 
-  allowaccessscloudwatch:
-    Type: 'AWS::IAM::RolePolicy'
-    Properties:
-      PolicyName: allowaccesscloudwatch
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-            - 'logs:CreateLogGroup'
-            - 'logs:CreateLogStream'
-            - 'logs:PutLogEvents'
-            Resource:
-              - '*'
-      RoleName: !Ref ApiGatewayToCloudWatchRole
+  # カスタマーマネージドポリシーだと上手くいかんかった。
+  # ApiGatewayToCloudWatchRole:
+  #   Type: 'AWS::IAM::Role'
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service: apigateway.amazonaws.com
+  #           Action: sts:AssumeRole
 
-
-      # Policies:
-      #   - PolicyName: alloowassumerole
-      #     PolicyDocument:
-      #       Version: "2012-10-17"
-      #       Statement:
-      #         - Effect: Allow
-      #           Action:
-      #             - 'sts:AssumeRole'
-      #           Resource:
-      #             - !GetAtt S3AccessRole.Arn
-      #   - PolicyName: allowaccesssecretsmanager
-      #     PolicyDocument:
-      #       Version: "2012-10-17"
-      #       Statement:
-      #         - Effect: Allow
-      #           Action:
-      #             - 'secretsmanager:GetSecretValue'
-      #           Resource:
-      #             - !Ref SecretsManagerARN
-
+  # allowaccessscloudwatch:
+  #   Type: 'AWS::IAM::RolePolicy'
+  #   Properties:
+  #     PolicyName: allowaccesscloudwatch
+  #     PolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Action:
+  #           - 'logs:CreateLogGroup'
+  #           - 'logs:CreateLogStream'
+  #           - 'logs:PutLogEvents'
+  #           Resource:
+  #             - '*'
+  #     RoleName: !Ref ApiGatewayToCloudWatchRole
 
 Outputs:
   S3AccessRole:

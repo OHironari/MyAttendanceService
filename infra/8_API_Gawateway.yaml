@@ -25,7 +25,7 @@ Resources:
       HttpMethod: POST
       AuthorizationType: NONE
       RequestParameters:
-        method.request.header.myheader: false
+        method.request.header.Content-Type: false
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
@@ -35,13 +35,9 @@ Resources:
             - - !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/"
               - !ImportValue FunctionARN
               - "/invocations"
-        RequestParameters:
-          integration.request.header.header1: method.request.header.myheader
-      MethodResponses:
-        - StatusCode: '200'
-          ResponseParameters:
-            method.response.header.header1: true
-            method.response.header.header2: true
+        # RequestParameters:
+          # integration.request.header.Content-Type: "'application/json'" 
+        PassthroughBehavior: WHEN_NO_MATCH
   
   MyDomainName:
     Type: AWS::ApiGateway::DomainName
@@ -73,15 +69,19 @@ Resources:
       RestApiId: !Ref MyApiGateway
       DeploymentId: !Ref MyDeployment
       MethodSettings:
-        - LoggingLevel: INFO,ERROR
+        - LoggingLevel: ERROR
           ResourcePath: "/*"
           HttpMethod: "*"
           MetricsEnabled: true
           DataTraceEnabled: true
       AccessLogSetting:
-        DestinationArn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/apigateway/access-logs"
-        Format: '{ "requestId":"$context.requestId", "ip":"$context.identity.sourceIp", "userAgent":"$context.identity.userAgent", ... }'
-
+        DestinationArn: !ImportValue APIGatewayLogGroup
+        # Format: '{ "requestId":"$context.requestId", "ip":"$context.identity.sourceIp", "userAgent":"$context.identity.userAgent", ... }'
+  
+  MyAPIGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !ImportValue ApiGatewayToCloudWatchRole
 
 
 Outputs:

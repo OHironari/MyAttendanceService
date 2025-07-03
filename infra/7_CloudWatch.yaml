@@ -1,0 +1,15 @@
+
+
+Resources:
+  APIGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupClass: STANDARD
+      LogGroupName: /aws/apigateway/MyApiGateway
+
+Outputs:
+  APIGatewayLogGroup:
+    Value: !GetAtt APIGatewayLogGroup.Arn
+    Description: This define the log group for api gateway request
+    Export:
+      Name: APIGatewayLogGroup

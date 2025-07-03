@@ -9,24 +9,41 @@ from datetime import date
 from datetime import time
 import re
 import json
+import urllib.parse
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-#ゆくゆくはSSMからの取得をしたい
+#重要度は低いので、lambdaの環境変数から取得
 bucket_name=os.getenv("bucket_name")
 secrets_manager_arn=os.getenv("secrets_manager_arn")
-secrets_value_for_iam_role = os.getenv("secrets_value_for_iam_role")
 
 def lambda_handler(event, context):
     try:
-        body = json.loads(event["body"])
+        logger.info(event)
+        content_type = event.get("headers", {}).get("content-type", "")
+        if "application/json" in content_type:
+            body = json.loads(event["body"])
+        else:
+            # x-www-form-urlencoded → dict(list) → dict(str)
+            parsed = urllib.parse.parse_qs(event.get("body") or "")
+            body = {k: v[0] for k, v in parsed.items()}
+            logger.info(body)
+        
+        # Class
         work_record = workrecord(
             work_date=body["work_date"],
             start_time=body["start_time"],
             end_time=body["end_time"]
         )
-        logger.info(f"work_record:{work_record}")
+
+        # Input Check
+        check=Input_Check(work_record)
+        if check:
+            return response(500, {'error': check,
+                                    'work_date': work_record.work_date,
+                                    'start_time': work_record.start_time,
+                                    'end_time': work_record.end_time})
 
         # get assume role arn from secrets manager
         role_arn = get_role_arn()
@@ -73,6 +90,11 @@ def get_role(role_arn):
         return session
     except Exception as e:
         return  {"error": str(e)}
+
+def Input_Check(work_record):
+    #入力時間チェック
+    if work_record.start_time > work_record.end_time:
+        return 'end_time before start_time'
 
 def main_logic(event,session,work_record):
     try:
@@ -122,7 +144,10 @@ def main_logic(event,session,work_record):
         # S3にアップロード（上書き or 別ファイルにする場合はOBJECT_KEYを変える）
         s3_client.put_object(Bucket=bucket_name, Key=object_key, Body=out_mem_file.getvalue())
 
-        return {'message': 's3 upload successfully'}
+        return {'message': 's3 upload successfully',
+                    'work_date': work_record.work_date,
+                    'start_time': work_record.start_time,
+                    'end_time': work_record.end_time}
 
     except Exception as e:
         logger.error(f"Error in main_logic: {e}")
@@ -130,9 +155,13 @@ def main_logic(event,session,work_record):
 
 
 def response(status_code, body):
-    logger.info(f'statusCode:{status_code}')
-    logger.info(body)
-    return
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json"
+        },
+        "body": json.dumps(body, default=str)
+    }
 
 
 class workrecord:
@@ -151,12 +180,12 @@ class workrecord:
             self.end_time = datetime.strptime(end_time, "%H:%M").time()
         else:
             self.end_time = time(17, 30)  # 17:30
-    
+
     def __str__(self):
         date_str = self.work_date.strftime("%Y-%m-%d")
         start_str = self.start_time.strftime("%H:%M")
         end_str = self.end_time.strftime("%H:%M")
         return f"{date_str} | {start_str} - {end_str}"
 
-# curl https://app.itononari.xyz/submit -XPOST -H "Content-Type: application/json" -d '{"work_date":"2025-07-03", "start_time":"09:00", "end_time":"18:15"}'
+# curl https://app.itononari.xyz/submit -XPOST -H "Content-Type: application/json" -d '{"work_date":"2025-07-04", "start_time":"09:00", "end_time":"18:15"}'
 
