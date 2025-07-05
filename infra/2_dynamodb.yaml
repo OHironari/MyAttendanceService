@@ -1,0 +1,45 @@
+
+Resources:
+
+  AttendanceTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AttendanceRecords
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: work_date
+          AttributeType: S
+
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH   # パーティションキー
+        - AttributeName: work_date
+          KeyType: RANGE  # ソートキー
+        # - AttributeName: day_of_the_week
+        #   AttributeType: S
+        # - AttributeName: work_style
+        #   AttributeType: S
+        # - AttributeName: start_time
+        #   AttributeType: S
+        # - AttributeName: end_time
+        #   AttributeType: S
+        # - AttributeName: work_time
+        #   AttributeType: S
+        # - AttributeName: break_time
+        #   AttributeType: S
+        # - AttributeName: note
+        #   AttributeType: S
+      BillingMode: PAY_PER_REQUEST  # または PROVISIONED として Read/WriteCapacityUnits を指定
+      Tags:
+        - Key: Name
+          Value: attendance-table
+        - Key: Env
+          Value: dev
+
+Outputs:
+  AttendancetblArn:
+    Value: !GetAtt AttendanceTable.Arn
+    Description: Attendance Table Arn
+    Export:
+      Name: AttendancetblArn

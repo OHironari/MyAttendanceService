@@ -64,9 +64,9 @@ Resources:
     Properties:
       CachePolicyConfig: 
         Name: GetCachePolicy
-        DefaultTTL: 300            # デフォルト 5分
-        MinTTL: 0                  # 最小 0秒（オリジンから取得し直せる）
-        MaxTTL: 3600               # 最大 1時間（キャッシュが生きる最長時間）
+        DefaultTTL: 1            # デフォルト 5分
+        MinTTL: 1               # 最小 0秒（オリジンから取得し直せる）
+        MaxTTL: 1               # 最大 1時間（キャッシュが生きる最長時間）
         ParametersInCacheKeyAndForwardedToOrigin:
           EnableAcceptEncodingGzip: true
           EnableAcceptEncodingBrotli: true

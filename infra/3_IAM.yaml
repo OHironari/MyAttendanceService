@@ -59,6 +59,7 @@ Resources:
               - 'sts:AssumeRole'
             Resource:
               - !GetAtt S3AccessRole.Arn
+              #- !GetAtt LambdaExecutionRole.Arn
       RoleName: !Ref LambdaRole
 
 
@@ -80,7 +81,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
           Effect: Allow
           Principal:
@@ -89,33 +90,49 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
 
-  # カスタマーマネージドポリシーだと上手くいかんかった。
-  # ApiGatewayToCloudWatchRole:
-  #   Type: 'AWS::IAM::Role'
-  #   Properties:
-  #     AssumeRolePolicyDocument:
-  #       Version: "2012-10-17"
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #             Service: apigateway.amazonaws.com
-  #           Action: sts:AssumeRole
+  # すまんがここでLambdaのARN経由からのみアクセスを許可するためのIAM Roleを作成
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-dynamodb-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !GetAtt LambdaRole.Arn
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoAccessPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource: !ImportValue AttendancetblArn
 
-  # allowaccessscloudwatch:
-  #   Type: 'AWS::IAM::RolePolicy'
-  #   Properties:
-  #     PolicyName: allowaccesscloudwatch
-  #     PolicyDocument:
-  #       Version: "2012-10-17"
-  #       Statement:
-  #         - Effect: Allow
-  #           Action:
-  #           - 'logs:CreateLogGroup'
-  #           - 'logs:CreateLogStream'
-  #           - 'logs:PutLogEvents'
-  #           Resource:
-  #             - '*'
-  #     RoleName: !Ref ApiGatewayToCloudWatchRole
+  # Lambda以外はaccess拒否
+  AccessDenyexceptLambda:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AccessDenyexceptLambdaPolicy
+      Roles: 
+        - !Ref LambdaExecutionRole
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Deny"
+            Action: "dynamodb:*"
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttendanceRecords"
+            Condition:
+              StringNotEquals:
+                aws:PrincipalArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/lambda-dynamodb-role"
+                
 
 Outputs:
   S3AccessRole:
