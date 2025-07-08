@@ -77,6 +77,20 @@ Resources:
               - !Ref SecretsManagerARN
       RoleName: !Ref LambdaRole
 
+  # Download Lambdaからdynamo Lambdaへのアクセスを許可
+  AccessAllowDonwloadToDynamo:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AccessAllowDonwloadToDynamo
+      Roles: 
+        - !Ref LambdaRole
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "lambda:InvokeFunction"
+            Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:MyAttendanceFunction"
+
   ApiGatewayToCloudWatchRole:
     Type: AWS::IAM::Role
     Properties:
@@ -132,7 +146,6 @@ Resources:
             Condition:
               StringNotEquals:
                 aws:PrincipalArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/lambda-dynamodb-role"
-                
 
 Outputs:
   S3AccessRole:

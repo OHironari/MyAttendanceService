@@ -122,7 +122,26 @@ Resources:
 
 
         CacheBehaviors:
+          # For Get List
           - PathPattern: /submit*
+            TargetOriginId: APIOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - POST
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            CachePolicyId: !Ref PostCachePolicy
+
+          # For Download file
+          - PathPattern: /download*
             TargetOriginId: APIOrigin
             ViewerProtocolPolicy: redirect-to-https
             AllowedMethods:

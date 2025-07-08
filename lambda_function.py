@@ -1,14 +1,11 @@
 import boto3
 from boto3.dynamodb.conditions import Key
-import openpyxl
 from openpyxl.utils import column_index_from_string, get_column_letter
-import io
 import os
 import logging
 from datetime import datetime,timedelta
 from datetime import date
 from datetime import time
-import re
 import json
 import urllib.parse
 import calendar
@@ -33,14 +30,14 @@ def lambda_handler(event, context):
             body = {k: v[0] for k, v in parsed.items()}
         # Class
         work_record = workrecord(
-            work_date=body["work_date"],
-            day_of_the_week=body["day_of_the_week"],
-            work_style=body["work_style"],
-            start_time=body["start_time"],
-            end_time=body["end_time"],
-            work_time=body["work_time"],
-            break_time=body["break_time"],
-            note=body["note"],
+            work_date=body.get("work_date", None),
+            day_of_the_week=body.get("day_of_the_week", None),
+            work_style=body.get("work_style", None),
+            start_time=body.get("start_time", None),
+            end_time=body.get("end_time", None),
+            work_time=body.get("work_time", None),
+            break_time=body.get("break_time", None),
+            note=body.get("note", None),
         )
         logger.info(f"work_record:{work_record}")
 
@@ -126,103 +123,6 @@ def Input_Check(work_record):
     if work_record.start_time != None and work_record.end_time != None:
         if work_record.start_time > work_record.end_time:
             return 'end_time before start_time'
-
-
-# file編集　
-# 7/4 ダウンロード時のファイル作成で使用したいかな
-def main_logic(event,session,work_record):
-    try:
-        # S3 client
-        s3_client = session.client('s3')
-        object_key = 'attendance_202507.xlsx'
-        object_path = f"attendance/files/{object_key}"
-        logger.info(f"対象ファイル: s3://{bucket_name}/{object_path}")
-
-        # 1️⃣ S3からファイルをダウンロード（メモリ上）
-        response = s3_client.get_object(Bucket=bucket_name, Key=object_path)
-        excel_data = response['Body'].read()
-        in_mem_file = io.BytesIO(excel_data)
-
-        # Excel読み込み
-        workbook = openpyxl.load_workbook(in_mem_file)
-        sheet = workbook.active
-
-        # ====== 編集処理 ======
-        search_range = sheet["B8:B38"]
-
-        for row in search_range:
-            for cell in row:
-                cell_value = sheet[cell.coordinate].value
-
-                # セルが datetime または date の場合のみ比較
-                if isinstance(cell_value, (datetime, date)):
-                    if cell_value.strftime("%Y-%m-%d") == work_record.work_date.strftime("%Y-%m-%d"):
-
-                        # 行番号・列文字の取得
-                        col_letters, row_number = re.match(r"([A-Z]+)(\d+)", cell.coordinate).groups()
-                        col_num = column_index_from_string(col_letters)
-                        row_number = int(row_number)
-
-                        # 列番号を使ってセル位置を計算
-                        start_time_cell = f"{get_column_letter(col_num + 3)}{row_number}"
-                        end_time_cell = f"{get_column_letter(col_num + 4)}{row_number}"
-
-                        # セルに値をセット（sheet が正しい）
-                        sheet[start_time_cell].value = work_record.start_time
-                        sheet[end_time_cell].value = work_record.end_time
-
-
-        # 一覧の情報を全て取得して返却する
-        records = []
-        for row in sheet["B8:I38"]:
-            date_cell = row[0]
-            day_of_the_week_cell = row[1]
-            work_style_cell = row[2]
-            start_cell = row[3]
-            end_cell = row[4]
-            break_time_cell = row[5]
-            work_time_cell = row[6]
-            note_cell = row[7]
-
-            # 仮の日付で time → datetime に変換
-            start_dt = datetime.combine(date.today(), start_cell.value) if isinstance(start_cell.value, time) else None
-            end_dt = datetime.combine(date.today(), end_cell.value) if isinstance(end_cell.value, time) else None
-            break_td = timedelta(hours=break_time_cell.value.hour, minutes=break_time_cell.value.minute) if isinstance(break_time_cell.value, time) else timedelta()
-
-            if start_dt and end_dt:
-                work_duration = end_dt - start_dt - break_td
-                work_time_str = str(work_duration)
-            else:
-                work_time_str = ""
-
-            if isinstance(date_cell.value, (datetime, date)):
-                records.append({
-                    "date": date_cell.value.strftime("%Y-%m-%d"),
-                    "day_of_the_week": str(day_of_the_week_cell.value),
-                    "work_style": str(work_style_cell.value),
-                    "start": start_cell.value.strftime("%H:%M") if isinstance(start_cell.value, time) else (start_cell.value or ""),
-                    "end": end_cell.value.strftime("%H:%M") if isinstance(end_cell.value, time) else (end_cell.value or ""),
-                    "break_time": break_time_cell.value.strftime("%H:%M") if isinstance(break_time_cell.value, time) else (break_time_cell.value or ""),
-                    "work_time": work_time_str,
-                    "note":str(note_cell.value) if note_cell.value else (note_cell.value or ""),
-                })
-
-        # 編集後をメモリに書き込む
-        out_mem_file = io.BytesIO()
-        workbook.save(out_mem_file)
-        out_mem_file.seek(0)
-
-        # S3にアップロード（上書き or 別ファイルにする場合はOBJECT_KEYを変える）
-        s3_client.put_object(Bucket=bucket_name, Key=object_path, Body=out_mem_file.getvalue())
-
-        return {'message': 's3 upload successfully',
-                    'records': records
-        }
-    
-    except Exception as e:
-        logger.error(f"Error in main_logic: {e}")
-        return {'message': 'failed in main logic', 'error': str(e)}
-
 
 def response(status_code, body):
     return {
@@ -378,10 +278,7 @@ class workrecord:
 
         # break time のセット（先に設定する）
         if self.work_style == "休み":
-            self.break_time = None
-        elif break_time:
-            bt = datetime.strptime(break_time, "%H:%M")
-            self.break_time = timedelta(hours=bt.hour, minutes=bt.minute)          
+            self.break_time = None    
         else:
             self.break_time = self.calculate_break_minutes(self.start_time, self.end_time)
 

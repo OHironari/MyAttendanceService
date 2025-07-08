@@ -54,6 +54,18 @@ h2 {
   cursor: pointer;
 }
 
+.download_button {
+  display: inline-block;
+  font-size: 1.1rem;
+  margin: 1rem 0.5rem;
+  padding: 0.5rem 2rem;
+  color: #f4f1de;
+  background: #008f24;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 .button-row {
   display: flex;
   justify-content: center;

@@ -14,12 +14,9 @@
     <form class="form" style="display:inline;">
       <button class="form_button" type="submit">一覧表示</button>
     </form>
-
-    <a href="https://app.itononari.xyz/attendance_202507.xlsx" download>
-      <button style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px;">
-        勤怠データをダウンロード
-      </button>
-    </a>
+    <button class="download_button" id="downloadBtn" type="button">
+      勤怠データをダウンロード
+    </button>
   </div>
 
   <div class="month-nav">
@@ -106,7 +103,6 @@
           dayClass = "sun";
         }
 
-        // 実動時間（例："07:45"）を分に変換して合計
         if (r.work_time && /^\d+:\d+$/.test(r.work_time)) {
           const [h, m] = r.work_time.split(":").map(Number);
           totalMinutes += h * 60 + m;
@@ -136,7 +132,6 @@
       html += "</tbody></table>";
       tableArea.innerHTML = html;
 
-      // 合計時間を表示
       const totalHours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
       const totalMins = String(totalMinutes % 60).padStart(2, "0");
       totalWorkTimeEl.textContent = `実働合計：${totalHours}:${totalMins}`;
@@ -214,6 +209,42 @@
           alert("送信エラー：" + err.message);
         });
     }
+
+ document.getElementById("downloadBtn").addEventListener("click", async (e) => {
+  e.preventDefault();
+
+  console.log("ダウンロードボタン押下");
+
+  const work_date = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+
+  try {
+    const response = await fetch("/download", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ work_date })
+    });
+
+    if (!response.ok) {
+      throw new Error("取得失敗: " + response.status);
+    }
+
+    // JSONとしてレスポンスを取得
+    const result = await response.json();
+
+// ⬇️ ここが追加・修正ポイント
+    const a = document.createElement("a");
+    a.href = result.url;
+    a.download = "";  // ファイル名を指定したい場合は "filename.xlsx" など
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+  } catch (err) {
+    alert("エラー: " + err.message);
+  }
+});
   </script>
 </body>
 </html>

@@ -17,6 +17,13 @@ Resources:
       ParentId: !GetAtt MyApiGateway.RootResourceId
       PathPart: submit
 
+  MyDownloadResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ParentId: !GetAtt MyApiGateway.RootResourceId
+      PathPart: download
+
   LambdaMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -39,6 +46,28 @@ Resources:
           # integration.request.header.Content-Type: "'application/json'" 
         PassthroughBehavior: WHEN_NO_MATCH
   
+  LambdaDownloadMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ResourceId: !Ref MyDownloadResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.Content-Type: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          !Join
+            - ''
+            - - !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/"
+              - !ImportValue DownloadFunctionARN
+              - "/invocations"
+        # RequestParameters:
+          # integration.request.header.Content-Type: "'application/json'" 
+        PassthroughBehavior: WHEN_NO_MATCH
+
   MyDomainName:
     Type: AWS::ApiGateway::DomainName
     Properties:
@@ -58,7 +87,10 @@ Resources:
 
   MyDeployment:
     Type: AWS::ApiGateway::Deployment
-    DependsOn: LambdaMethod
+    # 謎だがこいつを入れることによってstageとresourceが紐づく
+    DependsOn: 
+      - LambdaMethod
+      - LambdaDownloadMethod
     Properties:
       RestApiId: !Ref MyApiGateway
 

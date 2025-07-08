@@ -12,6 +12,7 @@ const form = document.querySelector(".form");
 const output = document.getElementById("output");
 const tableArea = document.getElementById("workTableArea");
 
+// 一覧表示のフォーム送信
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (output) output.textContent = "送信中...";
@@ -48,6 +49,7 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
+// 勤怠一覧テーブル描画
 function renderTable(records) {
   if (!records.length) {
     tableArea.innerHTML = "<p>表示するデータがありません。</p>";
@@ -57,12 +59,17 @@ function renderTable(records) {
   let html = `<table border="1">
                 <tr><th>日付</th><th>開始</th><th>終了</th></tr>`;
   for (const rec of records) {
-    html += `<tr><td>${rec.work_date || rec.date}</td><td>${rec.start_time || rec.start}</td><td>${rec.end_time || rec.end}</td></tr>`;
+    html += `<tr>
+               <td>${rec.work_date || rec.date}</td>
+               <td>${rec.start_time || rec.start}</td>
+               <td>${rec.end_time || rec.end}</td>
+             </tr>`;
   }
   html += "</table>";
   tableArea.innerHTML = html;
 }
 
+// 月切り替え
 function changeMonth(offset) {
   currentMonth += offset;
   if (currentMonth < 1) {
@@ -100,5 +107,47 @@ function changeMonth(offset) {
     });
 }
 
+// ダウンロードボタン処理
+document.addEventListener("DOMContentLoaded", () => {
+  const downloadBtn = document.getElementById("downloadBtn");
+  if (!downloadBtn) {
+    console.error("downloadBtn が見つかりません。HTMLのIDを確認してください。");
+    return;
+  }
 
+  downloadBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
 
+    console.log("ダウンロードボタン押下");
+
+    // 表示中の月の1日をwork_dateに設定
+    const work_date = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+
+    try {
+      const response = await fetch("/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ work_date })
+      });
+
+      if (!response.ok) {
+        throw new Error("ダウンロード失敗: " + response.status);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "attendance.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("ダウンロードエラー: " + err.message);
+    }
+  });
+});
