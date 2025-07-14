@@ -24,6 +24,13 @@ Resources:
       ParentId: !GetAtt MyApiGateway.RootResourceId
       PathPart: download
 
+  MyAuthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ParentId: !GetAtt MyApiGateway.RootResourceId
+      PathPart: auth
+
   LambdaMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -68,6 +75,27 @@ Resources:
           # integration.request.header.Content-Type: "'application/json'" 
         PassthroughBehavior: WHEN_NO_MATCH
 
+  LambdaAuthMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ResourceId: !Ref MyAuthResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.Content-Type: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          !Join
+            - ''
+            - - !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/"
+              - !ImportValue AuthFunctionARN
+              - "/invocations"
+        PassthroughBehavior: WHEN_NO_MATCH
+
+
   MyDomainName:
     Type: AWS::ApiGateway::DomainName
     Properties:
@@ -91,6 +119,7 @@ Resources:
     DependsOn: 
       - LambdaMethod
       - LambdaDownloadMethod
+      - LambdaAuthMethod
     Properties:
       RestApiId: !Ref MyApiGateway
 

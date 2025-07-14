@@ -2,6 +2,20 @@ Parameters:
   SecretsManagerARN:
     Type: String
     Description: Into Secret Manager ARN. You have this one at us-east-1.
+  UserPoolId:
+    Type: String
+    Description: Into User Pool Id that published by cognito app client.(ex. ap-northeast-1.xxxxxxxx)
+  ClientId:
+    Type: String
+    Description: Into Client Id that published by cognito.
+  RedirectURI:
+    Type: String
+    Description: Into URI for invoke lambda.
+    Default: https://app.itononari.xyz/auth
+  CognitoDomain:
+    Type: String
+    Description: Into cognito domain
+    Default: auth.itononari.xyz
 
 Resources:
   PostFunction:
@@ -59,6 +73,94 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
 
+  AuthenticateFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MyAuthenticateFunciton
+      Description: "This define the Lambda Function for Authentication"
+      Code:
+        S3Bucket: !ImportValue S3BucketName
+        S3Key: auth_lambda_function.py.zip
+      Environment:
+        Variables:
+          bucket_name: !ImportValue S3BucketName
+          secrets_manager_arn: !Ref SecretsManagerARN
+          userpoolid: !Ref UserPoolId
+          clientid: !Ref ClientId
+          redirecturi: !Ref RedirectURI
+          cognitodomain: !Ref CognitoDomain
+      Role: !ImportValue LambdaRole
+      Runtime: "python3.13"
+      Handler: auth_lambda_function.lambda_handler
+      Timeout: 10
+      Layers:
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:jwt:2
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:requests:1
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:cryptography:6
+        
+
+  LambdaInvokePermissionForAuth:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthenticateFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+
+  CheckCredentialFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CheckCredentialFunction
+      Description: "This Function for validation user access"
+      Code:
+        S3Bucket: !ImportValue S3BucketName
+        S3Key: credential_lambda_function.py.zip
+      Environment:
+        Variables:
+          secrets_manager_arn: !Ref SecretsManagerARN
+          userpoolid: !Ref UserPoolId
+          clientid: !Ref ClientId
+      Role: !ImportValue CredentialLambdaRole
+      Runtime: "python3.13"
+      Handler: credential_lambda_function.lambda_handler
+      Timeout: 10
+      Layers:
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:jwt:2
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:rust:1
+
+  # Credential Rambda用のRole作成
+  # 基本的にこのLambda以外はアクセスできないようにする
+  # STS Assume Role用
+  CredentialLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: credential-dynamo-access-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !ImportValue CredentialLambdaRole
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CredentialDynamoAccessPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource: !ImportValue CredentialtblArn
+
+  LambdaInvokePermissionForCredential:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CheckCredentialFunction
+      Action: lambda:InvokeFunction
+      Principal: lambda.amazonaws.com
 
 Outputs:
   FunctionARN:
@@ -72,3 +174,16 @@ Outputs:
     Description: Return Download Function arn
     Export:
       Name: DownloadFunctionARN
+
+  AuthFunctionARN:
+    Value: !GetAtt AuthenticateFunction.Arn
+    Description: Return Authenticate Function arn
+    Export:
+      Name: AuthFunctionARN
+  
+  CredentialFunctionARN:
+    Value: !GetAtt CredentialLambdaExecutionRole.Arn
+    Description: Return Authenticate Function arn
+    Export:
+      Name: CredentialFunctionARN
+  

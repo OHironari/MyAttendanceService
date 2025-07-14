@@ -7,6 +7,10 @@ Parameters:
     Type: String
     Description: Please input domain name that you want to alternate cloud front domain name
     Default: api.itononari.xyz
+  MyAuthDomainName:
+    Type: String
+    Description: Please input domain name that you want to alternate cognito domain name
+    Default: auth.itononari.xyz
 
 Resources: 
   MyAppCertificate: 
@@ -19,4 +23,10 @@ Resources:
     Type: "AWS::CertificateManager::Certificate"
     Properties: 
       DomainName: !Ref MyApiDomainName
+      ValidationMethod: DNS
+
+  MyAuthCertificate: 
+    Type: "AWS::CertificateManager::Certificate"
+    Properties: 
+      DomainName: !Ref MyAuthDomainName
       ValidationMethod: DNS

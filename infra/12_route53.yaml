@@ -1,0 +1,48 @@
+Parameters:
+  MyHostZoneName:
+    Type: String
+    Description: Please into DNS Host Zone Name. Please into this format xxxx.yyy.
+    Default: itononari.xyz.
+  MyAppDomainName:
+    Type: String
+    Description: Please input domain name that you want to alternate cloudfront domain name
+    Default: app.itononari.xyz
+  MyApiDomainName:
+    Type: String
+    Description: Please input domain name that you want to alternate api gateway domain name
+    Default: api.itononari.xyz
+  MyAuthDomainName:
+    Type: String
+    Description: Please input domain name that you want to alternate cognito domain name
+    Default: auth.itononari.xyz
+
+Resources:
+  MyAppCnameRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Ref MyHostZoneName
+      Name: !Ref MyAppDomainName
+      Type: CNAME
+      TTL: 300
+      ResourceRecords:
+        - !ImportValue CloudfrontDomainName
+
+  MyApiCnameRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Ref MyHostZoneName
+      Name: !Ref MyApiDomainName
+      Type: CNAME
+      TTL: 300
+      ResourceRecords:
+        - !ImportValue ApigatewayDomainName
+
+  MyAuthCnameRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Ref MyHostZoneName
+      Name: !Ref MyAuthDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !ImportValue UserPoolDomain
+        HostedZoneId: Z2FDTNDATAQYW2  # CognitoのCloudFrontディストリビューションのホストゾーンIDは固定

@@ -69,7 +69,7 @@ h2 {
 .button-row {
   display: flex;
   justify-content: center;
-  gap: 1rem; /* ボタンの間隔 */
+  gap: 1rem;
   margin-top: 1rem;
 }
 
@@ -121,6 +121,7 @@ table {
   background-color: #f2f2f2;
   color: #000;
   border-collapse: collapse;
+  width: 100%;
 }
 
 th {
@@ -131,19 +132,6 @@ th {
 td {
   background-color: #fff;
   padding: 6px;
-}
-
-.col-note input {
-  width: 150px;
-}
-
-.col-action button {
-  padding: 4px 10px;
-  font-size: 0.9rem;
-  border: 1px solid #333;
-  background: #fff;
-  cursor: pointer;
-  border-radius: 4px;
 }
 
 .sat {
@@ -166,3 +154,43 @@ td {
 .col-worktime     { width: 7rem; }
 .col-note         { width: 10rem; }
 .col-action       { width: 5rem; }
+
+/* 追加: モバイル対応 */
+@media screen and (max-width: 600px) {
+  table, thead, tbody, th, td, tr {
+    display: block;
+    width: 100%;
+  }
+  thead tr {
+    display: none;
+  }
+  tr {
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px;
+  }
+  td::before {
+    content: attr(data-label);
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  .col-date,
+  .col-day,
+  .col-style,
+  .col-start,
+  .col-end,
+  .col-break,
+  .col-worktime,
+  .col-note,
+  .col-action {
+    width: 100% !important;
+  }
+}

@@ -48,9 +48,9 @@ Resources:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
     
   alloowassumerole:
-    Type: 'AWS::IAM::RolePolicy'
+    Type: 'AWS::IAM::ManagedPolicy'
     Properties:
-      PolicyName: alloowassumerole
+      ManagedPolicyName: alloowassumerole
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -60,13 +60,14 @@ Resources:
             Resource:
               - !GetAtt S3AccessRole.Arn
               #- !GetAtt LambdaExecutionRole.Arn
-      RoleName: !Ref LambdaRole
-
+      Roles:
+        - !Ref LambdaRole
+        - !Ref CredentialLambdaRole
 
   allowaccesssecretsmanager:
-    Type: 'AWS::IAM::RolePolicy'
+    Type: 'AWS::IAM::ManagedPolicy'
     Properties:
-      PolicyName: allowaccesssecretsmanager
+      ManagedPolicyName: allowaccesssecretsmanager
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -75,7 +76,9 @@ Resources:
               - 'secretsmanager:GetSecretValue'
             Resource:
               - !Ref SecretsManagerARN
-      RoleName: !Ref LambdaRole
+      Roles:
+        - !Ref LambdaRole
+        - !Ref CredentialLambdaRole
 
   # Download Lambdaからdynamo Lambdaへのアクセスを許可
   AccessAllowDonwloadToDynamo:
@@ -83,7 +86,7 @@ Resources:
     Properties:
       PolicyName: AccessAllowDonwloadToDynamo
       Roles: 
-        - !Ref LambdaRole
+        - !Ref S3AccessRole
       PolicyDocument: 
         Version: "2012-10-17"
         Statement:
@@ -130,6 +133,21 @@ Resources:
                   - dynamodb:Query
                 Resource: !ImportValue AttendancetblArn
 
+# 全てのlambdaからCheckCredentialFunctionへのアクセスを許可
+  AccessAllowCheckCredentialFunction:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AccessAllowCheckCredentialFunction
+      Roles: 
+        - !Ref LambdaRole
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "lambda:InvokeFunction"
+            Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CheckCredentialFunction"
+
+
   # Lambda以外はaccess拒否
   AccessDenyexceptLambda:
     Type: AWS::IAM::Policy
@@ -147,6 +165,22 @@ Resources:
               StringNotEquals:
                 aws:PrincipalArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/lambda-dynamodb-role"
 
+  # Credential Role
+  CredentialLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    
+
 Outputs:
   S3AccessRole:
     Value: !GetAtt S3AccessRole.Arn
@@ -163,5 +197,10 @@ Outputs:
     Description: for api gateway IAM ROLE
     Export:
       Name: ApiGatewayToCloudWatchRole
+  CredentialLambdaRole:
+    Value: !GetAtt CredentialLambdaRole.Arn
+    Description: For Credential Lambda IAM ROLE
+    Export:
+      Name: CredentialLambdaRole
 
 

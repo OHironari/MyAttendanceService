@@ -16,20 +16,7 @@ Resources:
           KeyType: HASH   # パーティションキー
         - AttributeName: work_date
           KeyType: RANGE  # ソートキー
-        # - AttributeName: day_of_the_week
-        #   AttributeType: S
-        # - AttributeName: work_style
-        #   AttributeType: S
-        # - AttributeName: start_time
-        #   AttributeType: S
-        # - AttributeName: end_time
-        #   AttributeType: S
-        # - AttributeName: work_time
-        #   AttributeType: S
-        # - AttributeName: break_time
-        #   AttributeType: S
-        # - AttributeName: note
-        #   AttributeType: S
+
       BillingMode: PAY_PER_REQUEST  # または PROVISIONED として Read/WriteCapacityUnits を指定
       Tags:
         - Key: Name
@@ -37,9 +24,39 @@ Resources:
         - Key: Env
           Value: dev
 
+  CredentialTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AccessAndUserManageRecord
+      AttributeDefinitions:
+        - AttributeName: sub
+          AttributeType: S
+        - AttributeName: lastaccesstime
+          AttributeType: S
+
+      KeySchema:
+        - AttributeName: sub
+          KeyType: HASH   # パーティションキー
+        - AttributeName: lastaccesstime
+          KeyType: RANGE  # ソートキー
+          
+      BillingMode: PAY_PER_REQUEST  # または PROVISIONED として Read/WriteCapacityUnits を指定
+      Tags:
+        - Key: Name
+          Value: AccessAndUserManageRecord
+        - Key: Env
+          Value: dev
+
+
 Outputs:
   AttendancetblArn:
     Value: !GetAtt AttendanceTable.Arn
     Description: Attendance Table Arn
     Export:
       Name: AttendancetblArn
+
+  CredentialtblArn:
+    Value: !GetAtt   CredentialTable.Arn
+    Description: CredentialTable Arn
+    Export:
+      Name: CredentialtblArn

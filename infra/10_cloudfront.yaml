@@ -77,6 +77,18 @@ Resources:
           QueryStringsConfig:
             QueryStringBehavior: none
 
+  MyOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name: MyAllQueryStringPolicy
+        Comment: Forward all query strings to API Gateway
+        HeadersConfig:
+          HeaderBehavior: none
+        CookiesConfig:
+          CookieBehavior: none
+        QueryStringsConfig:
+          QueryStringBehavior: all
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -104,7 +116,8 @@ Resources:
               OriginProtocolPolicy: https-only  # API Gateway は HTTPS 前提
               OriginSSLProtocols:
                 - TLSv1.2
-            
+          
+        # S3のwebのbehavior
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
@@ -116,6 +129,7 @@ Resources:
             - HEAD
           Compress: true
           CachePolicyId: !Ref GetCachePolicy
+          ResponseHeadersPolicyId: !Ref MyResponsePolicy
           FunctionAssociations:
             - EventType: viewer-request
               FunctionARN: !Ref CloudFrontFunction
@@ -139,6 +153,7 @@ Resources:
               - HEAD
             Compress: true
             CachePolicyId: !Ref PostCachePolicy
+            ResponseHeadersPolicyId: !Ref MyResponsePolicy
 
           # For Download file
           - PathPattern: /download*
@@ -157,16 +172,84 @@ Resources:
               - HEAD
             Compress: true
             CachePolicyId: !Ref PostCachePolicy
+            ResponseHeadersPolicyId: !Ref MyResponsePolicy
+
+          # For Authentication
+          - PathPattern: /auth*
+            TargetOriginId: APIOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            CachePolicyId: !Ref GetCachePolicy
+            ResponseHeadersPolicyId: !Ref AuthResponsePolicy
+            OriginRequestPolicyId: !Ref MyOriginRequestPolicy
 
         ViewerCertificate:
           AcmCertificateArn: !Ref ACMCertificateArn
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
 
+  MyResponsePolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: MyResponsePolicy
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://auth.itononari.xyz https://app.itononari.xyz;"
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: same-origin
+            Override: true
+          XSSProtection:
+            Protection: true
+            ModeBlock: true
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: true
+            Override: true
+
+  AuthResponsePolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: AuthResponsePolicy
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            #Lambdaで埋め込みスクリプトを返却するため script-src に 'unsafe-inline' を入れる
+            ContentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://auth.itononari.xyz https://app.itononari.xyz;"
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: same-origin
+            Override: true
+          XSSProtection:
+            Protection: true
+            ModeBlock: true
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: true
+            Override: true
+
+
   CloudFrontFunction:
     Type: AWS::CloudFront::Function
     Properties:
-      Name: MyFunctionName
+      Name: MyAppFunctionName
       FunctionConfig:
         Comment: A basic CloudFront function
         Runtime: cloudfront-js-2.0
@@ -192,3 +275,4 @@ Outputs:
     Description: This is the Cloud Front Domain Name
     Export:
       Name: CloudfrontDomainName
+
