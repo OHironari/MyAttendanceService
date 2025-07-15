@@ -19,7 +19,6 @@ secrets_manager_arn=os.getenv("secrets_manager_arn")
 
 def lambda_handler(event, context):
     try:
-        logger.info(event)
         headers = {k.lower(): v for k, v in event.get("headers", {}).items()}
         content_type = headers.get("content-type", "")
         if "application/json" in content_type:
@@ -28,6 +27,13 @@ def lambda_handler(event, context):
             # x-www-form-urlencoded → dict(list) → dict(str)
             parsed = urllib.parse.parse_qs(event.get("body") or "")
             body = {k: v[0] for k, v in parsed.items()}
+
+        # Check Credential
+        logger.info(f"check_credential:{check_credential(body["id_token"])}")
+        if not check_credential(body["id_token"]):
+            logger.info("token expired")
+            return response(401,{'error': 'token expired'})
+
         # Class
         work_record = workrecord(
             work_date=body.get("work_date", None),
@@ -57,7 +63,6 @@ def lambda_handler(event, context):
 
         # assume role
         session=get_role(role_arn)
-        logger.info(f"session:{session}")
         if isinstance(session,dict) and "error" in session:
             return response(500,session)
 
@@ -366,5 +371,40 @@ class workrecord:
             (self.parse_time("03:15"), self.parse_time("03:45")),
             (self.parse_time("05:45"), self.parse_time("06:15")),
         ]
+
+def check_credential(id_token):
+    try:
+        payload = {
+            "idtoken": id_token,
+            "invokefunction": "Attendance Function"
+        }
+        logger.info(f"payload:{payload}")
+        lambda_client = boto3.client("lambda")
+        response = lambda_client.invoke(
+            FunctionName='CheckCredentialFunction',
+            InvocationType='RequestResponse',
+            Payload=json.dumps(payload)
+        )
+        payload_str = response["Payload"].read().decode("utf-8")
+        payload_dict = json.loads(payload_str)
+
+        logger.info(f"Credential response payload: {payload_dict}")
+        body_str = payload_dict.get("body", "{}")
+        body_dict = json.loads(body_str)
+
+        # ステータスコードチェック
+        status_code = payload_dict.get("statusCode", 500)
+
+        if status_code == 200 and body_dict.get("status") == "online":
+            return True
+        else:
+            logger.info(f"Invalid credential: {body_dict.get('error', 'Unknown error')}")
+            return False
+
+    except Exception as e:
+        logger.info(f"check_credential error: {str(e)}")
+        return False
+
+
 # curl https://app.itononari.xyz/submit -XPOST -H "Content-Type: application/json" -d '{"work_date":"2025-07-04", "start_time":"09:00", "end_time":"18:15"}'
 

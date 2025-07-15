@@ -126,41 +126,7 @@ Resources:
       Layers:
         - arn:aws:lambda:ap-northeast-1:324037284373:layer:jwt:2
         - arn:aws:lambda:ap-northeast-1:324037284373:layer:rust:1
-
-  # Credential Rambda用のRole作成
-  # 基本的にこのLambda以外はアクセスできないようにする
-  # STS Assume Role用
-  CredentialLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: credential-dynamo-access-role
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              AWS:
-                - !ImportValue CredentialLambdaRole
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: CredentialDynamoAccessPolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - dynamodb:GetItem
-                  - dynamodb:PutItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:Query
-                Resource: !ImportValue CredentialtblArn
-
-  LambdaInvokePermissionForCredential:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref CheckCredentialFunction
-      Action: lambda:InvokeFunction
-      Principal: lambda.amazonaws.com
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:cryptography:6
 
 Outputs:
   FunctionARN:
@@ -180,10 +146,5 @@ Outputs:
     Description: Return Authenticate Function arn
     Export:
       Name: AuthFunctionARN
-  
-  CredentialFunctionARN:
-    Value: !GetAtt CredentialLambdaExecutionRole.Arn
-    Description: Return Authenticate Function arn
-    Export:
-      Name: CredentialFunctionARN
+
   

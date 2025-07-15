@@ -165,6 +165,24 @@ Resources:
               StringNotEquals:
                 aws:PrincipalArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/lambda-dynamodb-role"
 
+  # Credential FunctionからDynamoDBへのアクセスポリシー
+  CredentialToDynamoAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CredentialToDynamoAccessPolicy
+      Roles: 
+        - !Ref CredentialLambdaRole
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: 
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:Query
+            Resource: !ImportValue CredentialtblArn
+
   # Credential Role
   CredentialLambdaRole:
     Type: 'AWS::IAM::Role'

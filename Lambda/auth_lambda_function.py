@@ -16,6 +16,7 @@ cognitodomain = os.getenv("cognitodomain")
 region = "ap-northeast-1"
 
 def lambda_handler(event, context):
+    logger.info(event)
     params = event.get("queryStringParameters") or {}
     code = params.get("code")
     if not code:
@@ -55,13 +56,21 @@ def lambda_handler(event, context):
 
     # sub email id_token アクセス時間をdynamoDBに記述する
     try:
+        payload = {
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "idtoken": id_token,
+            "invokefunction": "Authenticate Function"
+        }
+        
         lambda_client = boto3.client("lambda")
         response = lambda_client.invoke(
-            FunctionName='CheckCredentialFunction', 
-            InvocationType='RequestResponse',         # 同期呼び出しの場合（結果を待つ）
-            Payload=b'{"key1": "value1", "key2": "value2"}'
-        )
-        
+            FunctionName='CheckCredentialFunction',
+            InvocationType='RequestResponse',
+            Payload=json.dumps(payload)
+            )
+
     except Exception as e:
         logger.error(f"Check Credential failed: {e}")
         return {"statusCode": 500, "body": "Check Credential failed"}

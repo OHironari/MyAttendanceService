@@ -194,3 +194,7 @@ td {
     width: 100% !important;
   }
 }
+
+.highlight-today {
+  border: 3px solid #ff9900;
+}

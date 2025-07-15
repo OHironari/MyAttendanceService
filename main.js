@@ -50,7 +50,8 @@ async function fetchDataAndRender() {
     end_time: "",
     break_time: "",
     work_time: "",
-    note: ""
+    note: "",
+    id_token: idToken
   };
 
   try {
@@ -64,6 +65,12 @@ async function fetchDataAndRender() {
     });
 
     const result = await response.json();
+    if (result.error === "token expired") {
+      localStorage.removeItem("id_token");
+      redirectToLogin();
+      return;
+    }
+
     if (result.records) {
       renderTable(result.records);
     } else {
@@ -90,6 +97,7 @@ function renderTable(records) {
     </thead><tbody>`;
 
   let totalMinutes = 0;
+   const todayStr = new Date().toISOString().split("T")[0]; // "2025-07-15"
 
   for (const r of records) {
     let dayClass = "";
@@ -104,8 +112,11 @@ function renderTable(records) {
       totalMinutes += h * 60 + m;
     }
 
+    // 今日の場合は highlight クラスを追加
+    const todayClass = r.work_date === todayStr ? "highlight-today" : "";
+
     html += `
-      <tr data-date="${r.work_date}">
+      <tr data-date="${r.work_date}" class="${todayClass}">
         <td>${displayDate}</td>
         <td class="${dayClass}">${r.day_of_the_week || ""}</td>
         <td>
@@ -128,7 +139,6 @@ function renderTable(records) {
   html += "</tbody></table>";
   tableArea.innerHTML = html;
 
-  // ここで Submit ボタンにイベントを追加
   const buttons = tableArea.querySelectorAll(".submit-btn");
   buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -179,7 +189,8 @@ function submitRow(button) {
     end_time,
     break_time,
     work_time: "",
-    note
+    note,
+    id_token: idToken
   };
 
   fetch("/submit", {
@@ -192,6 +203,11 @@ function submitRow(button) {
   })
     .then(res => res.json())
     .then(json => {
+      if (json.error === "token expired") {
+        localStorage.removeItem("id_token");
+        redirectToLogin();
+        return;
+      }
       alert("送信完了");
       if (json.records) renderTable(json.records);
     })
@@ -199,8 +215,7 @@ function submitRow(button) {
       alert("送信エラー：" + err.message);
     });
 }
-window.submitRow = submitRow; 
-
+window.submitRow = submitRow;
 
 document.getElementById("downloadBtn").addEventListener("click", async (e) => {
   e.preventDefault();
@@ -213,7 +228,8 @@ document.getElementById("downloadBtn").addEventListener("click", async (e) => {
 
   const work_date = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
   const data = {
-    work_date
+    work_date,
+    id_token: idToken
   };
 
   try {
@@ -226,9 +242,13 @@ document.getElementById("downloadBtn").addEventListener("click", async (e) => {
       body: JSON.stringify(data)
     });
 
-    if (!response.ok) throw new Error("取得失敗: " + response.status);
-
     const result = await response.json();
+    if (result.error === "token expired") {
+      localStorage.removeItem("id_token");
+      redirectToLogin();
+      return;
+    }
+
     const a = document.createElement("a");
     a.href = result.url;
     a.download = "";
