@@ -31,9 +31,14 @@ def lambda_handler(event, context):
             body = {k: v[0] for k, v in parsed.items()}
 
         # Check Credential
-        if not check_credential(body["id_token"]):
+        check = check_credential(body["id_token"])
+        if check.get("status") == "false":
             logger.info("token expired")
-            return response(401,{'error': 'token expired'})
+            return response(401, {'error': 'token expired', 'records': []})
+        sub = check.get("sub")
+
+        body["sub"] = str(sub)
+
 
         # get assume role arn from secrets manager
         role_arn = get_role_arn_s3()
@@ -134,7 +139,10 @@ def get_attendance_list(body,session):
             'end_time': "",
             'break_time': "",
             'work_time': "",
-            'note': ""
+            'note': "",
+            'sub': body.get("sub"),
+            'id_token': body.get("id_token"),
+            'style': "readonly"
             })
         }
 
@@ -233,29 +241,26 @@ def write_list_to_excel(result,session):
 
 def check_credential(id_token):
     try:
-        payload = {
-            "idtoken": id_token,
-            "invokefunction": "Download Function"
-        }
-        
+        payload = {"idtoken": id_token, "invokefunction": "Download Function"}
+        logger.info(f"payload:{payload}")
         lambda_client = boto3.client("lambda")
         response = lambda_client.invoke(
             FunctionName='CheckCredentialFunction',
             InvocationType='RequestResponse',
             Payload=json.dumps(payload)
-            )
+        )
         payload_str = response["Payload"].read().decode("utf-8")
         payload_dict = json.loads(payload_str)
-
-        logger.info(f"Credential response payload: {payload_dict}")
         body_str = payload_dict.get("body", "{}")
-        body_dict = json.loads(body_str)        
-        if body_dict.get("status") == "online":
-            return True
-
+        body_dict = json.loads(body_str)
+        status_code = payload_dict.get("statusCode", 500)
+        if status_code == 200 and body_dict.get("status") == "online":
+            return {"status": "true", "sub": body_dict.get("sub"), "email": body_dict.get("email")}
+        else:
+            logger.info(f"Invalid credential: {body_dict.get('error', 'Unknown error')}")
+            return {"status": "false"}
     except Exception as e:
-        logger.info(f"check_credential error:{str(e)}")
-        return {'error':str(e)}
+        logger.info(f"check_credential error: {str(e)}")
+        return {"status": "false"}
 
 # curl https://app.itononari.xyz/download -XPOST -H "Content-Type: application/json" -d '{"work_date":"2025-07-04", "start_time":"09:00", "end_time":"18:15"}'
-

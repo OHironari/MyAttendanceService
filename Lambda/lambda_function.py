@@ -1,11 +1,8 @@
 import boto3
 from boto3.dynamodb.conditions import Key
-from openpyxl.utils import column_index_from_string, get_column_letter
 import os
 import logging
-from datetime import datetime,timedelta
-from datetime import date
-from datetime import time
+from datetime import datetime, timedelta, date, time
 import json
 import urllib.parse
 import calendar
@@ -13,9 +10,8 @@ import calendar
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-#重要度は低いので、lambdaの環境変数から取得
-bucket_name=os.getenv("bucket_name")
-secrets_manager_arn=os.getenv("secrets_manager_arn")
+bucket_name = os.getenv("bucket_name")
+secrets_manager_arn = os.getenv("secrets_manager_arn")
 
 def lambda_handler(event, context):
     try:
@@ -24,18 +20,17 @@ def lambda_handler(event, context):
         if "application/json" in content_type:
             body = json.loads(event["body"])
         else:
-            # x-www-form-urlencoded → dict(list) → dict(str)
             parsed = urllib.parse.parse_qs(event.get("body") or "")
             body = {k: v[0] for k, v in parsed.items()}
 
-        # Check Credential
-        logger.info(f"check_credential:{check_credential(body["id_token"])}")
-        if not check_credential(body["id_token"]):
+        check = check_credential(body["id_token"])
+        if check.get("status") == "false":
             logger.info("token expired")
-            return response(401,{'error': 'token expired'})
+            return response(401, {'error': 'token expired', 'records': []})
+        sub = check.get("sub")
 
-        # Class
         work_record = workrecord(
+            sub=sub,
             work_date=body.get("work_date", None),
             day_of_the_week=body.get("day_of_the_week", None),
             work_style=body.get("work_style", None),
@@ -44,136 +39,114 @@ def lambda_handler(event, context):
             work_time=body.get("work_time", None),
             break_time=body.get("break_time", None),
             note=body.get("note", None),
+            submit=body.get("submit", None)
         )
         logger.info(f"work_record:{work_record}")
 
-        # Input Check
-        check=Input_Check(work_record)
+        check = Input_Check(work_record)
         if check:
-            return response(500, {'error': check,
-                                    'work_date': work_record.work_date,
-                                    'start_time': work_record.start_time,
-                                    'end_time': work_record.end_time})
+            return response(400, {'error': check, 'records': []})
 
-        # get assume role arn from secrets manager
         role_arn = get_role_arn_dynamo()
         logger.info(f"role_arn:{role_arn}")
         if role_arn is None or isinstance(role_arn, dict):
-            return response(500, {'error': 'Failed to get role arn', 'detail': role_arn})
+            return response(500, {'error': 'Failed to get role arn', 'records': []})
 
-        # assume role
-        session=get_role(role_arn)
-        if isinstance(session,dict) and "error" in session:
-            return response(500,session)
+        session = get_role(role_arn)
+        if isinstance(session, dict) and "error" in session:
+            return response(500, {'error': session['error'], 'records': []})
 
-        # S3 からDynamoへ移行する
-        # result = main_logic(event,session,work_record)
-        result = write_AttendanceRecords(event,session,work_record)
-        result = read_AttendanceRecord(event,session,work_record)
+        result = read_AttendanceRecord(event, session, work_record)
 
-        # 取得した中で日付が欠落していたらレコードを自動生成する
         if work_record.work_date:
             search_year = int(work_record.work_date.strftime("%Y"))
             search_month = int(work_record.work_date.strftime("%m"))
         else:
-            search_year = int(datetime.combine(date.today(), time.min).strftime("%Y"))
-            search_month = int(datetime.combine(date.today(), time.min).strftime("%m"))
-        lack_days = check_month_dates(result['records'], search_year, search_month).get("missing_dates",[])
+            today = datetime.combine(date.today(), time.min)
+            search_year = int(today.strftime("%Y"))
+            search_month = int(today.strftime("%m"))
+
+        lack_days = check_month_dates(result['records'], search_year, search_month).get("missing_dates", [])
         if lack_days:
             for lack_day in lack_days:
-                # classの定義
-                work_record_lack_day = workrecord(work_date=lack_day)
+                work_record_lack_day = workrecord(sub=sub, work_date=lack_day)
                 logger.info(f"lackday[{lack_day}]:{work_record_lack_day}")
-                result = write_AttendanceRecords(event,session,work_record_lack_day)
-            # 改めて一覧を取得しにいく 引数にはPOST時の日付を使えば多分大丈夫
-            result = read_AttendanceRecord(event,session,work_record)
+                write_AttendanceRecords(event, session, work_record_lack_day)
+            result = read_AttendanceRecord(event, session, work_record)
 
+        if not body.get("style") == "readonly":
+            write_AttendanceRecords(event, session, work_record)
+            result = read_AttendanceRecord(event, session, work_record)
 
         return response(200, result)
-        
+
     except Exception as e:
-        return response(500, {'error': str(e)})
+        logger.error(f"Exception: {str(e)}")
+        return response(500, {'error': str(e), 'records': []})
 
 def get_role_arn_dynamo():
     try:
-        sct_mgr = boto3.client(service_name='secretsmanager',region_name='us-east-1')
-        sct_mgr_iam_role_arn = sct_mgr.get_secret_value(
-            SecretId=secrets_manager_arn
-        )
-        secret_dict= json.loads(sct_mgr_iam_role_arn['SecretString'])
+        sct_mgr = boto3.client(service_name='secretsmanager', region_name='us-east-1')
+        sct_mgr_iam_role_arn = sct_mgr.get_secret_value(SecretId=secrets_manager_arn)
+        secret_dict = json.loads(sct_mgr_iam_role_arn['SecretString'])
         return secret_dict['dynamo_db_access_role_arn']
-
     except Exception as e:
         return str(e)
 
 def get_role(role_arn):
     try:
-        sts = boto3.client('sts',region_name='ap-northeast-1')
-        response = sts.assume_role(
-            RoleArn=role_arn,
-            RoleSessionName="accessdynamo",
-            #DurationSecond=900
-            
+        sts = boto3.client('sts', region_name='ap-northeast-1')
+        response = sts.assume_role(RoleArn=role_arn, RoleSessionName="accessdynamo")
+        session = boto3.Session(
+            aws_access_key_id=response['Credentials']['AccessKeyId'],
+            aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+            aws_session_token=response['Credentials']['SessionToken'],
+            region_name='ap-northeast-1'
         )
-        session = boto3.Session(aws_access_key_id=response['Credentials']['AccessKeyId'],
-                                aws_secret_access_key=response['Credentials']['SecretAccessKey'],
-                                aws_session_token=response['Credentials']['SessionToken'],
-                                region_name='ap-northeast-1')
         return session
     except Exception as e:
-        return  {"error": str(e)}
+        return {"error": str(e)}
 
 def Input_Check(work_record):
-    #入力時間チェック
-    if work_record.start_time != None and work_record.end_time != None:
+    if work_record.start_time and work_record.end_time:
         if work_record.start_time > work_record.end_time:
             return 'end_time before start_time'
 
 def response(status_code, body):
     return {
         "statusCode": status_code,
-        "headers": {
-            "Content-Type": "application/json; charset=utf-8"
-        },
+        "headers": {"Content-Type": "application/json; charset=utf-8"},
         "body": json.dumps(body, default=str)
     }
 
-#曜日の取得
 def get_weekday_abbr(dt: datetime) -> str:
     return dt.strftime("%a")
 
-
-# dynamo db
-def write_AttendanceRecords(event,session,work_record):
+def write_AttendanceRecords(event, session, work_record):
     client = session.client('dynamodb')
     table_name = 'AttendanceRecords'
-
-    # まず初回起動時はDBの取得のみ
     try:
-        #work_dateがあれば入力
         if work_record.work_date:
             response = client.put_item(
                 TableName=table_name,
                 Item={
-                    'user_id': {'S': 'iamuser'},
-                    'work_date': {'S': work_record.work_date.strftime("%Y-%m-%d") if work_record.work_date else ""},
-                    'day_of_the_week': {'S': str(work_record.day_of_the_week) if work_record.day_of_the_week else ""},
-                    'work_style': {'S': str(work_record.work_style) if work_record.work_style else ""},
+                    'user_id': {'S': str(work_record.sub)},
+                    'work_date': {'S': work_record.work_date.strftime("%Y-%m-%d")},
+                    'day_of_the_week': {'S': str(work_record.day_of_the_week)},
+                    'work_style': {'S': str(work_record.work_style)},
                     'start_time': {'S': work_record.start_time.strftime("%H:%M") if work_record.start_time else ""},
                     'end_time': {'S': work_record.end_time.strftime("%H:%M") if work_record.end_time else ""},
-                    'break_time': {'S': format_timedelta(work_record.break_time)  if work_record.break_time else ""},
-                    'work_time': {'S': format_timedelta(work_record.work_time)  if work_record.work_time else ""},
-                    'note': {'S': str(work_record.note) if work_record.note else ""}
+                    'break_time': {'S': format_timedelta(work_record.break_time) if work_record.break_time else ""},
+                    'work_time': {'S': format_timedelta(work_record.work_time) if work_record.work_time else ""},
+                    'note': {'S': str(work_record.note) if work_record.note else ""},
+                    'submit': {'S': str(work_record.submit) if work_record.submit else "0"}
                 }
             )
             logger.info(f"[success]write:{response}")
     except Exception as e:
-        logger.error(f"[error]write: write db failed - {str(e)}")
-        return {'error': str(e)}
+        logger.error(f"[error]write: {str(e)}")
 
-def read_AttendanceRecord(event,session,work_record):
-    # work_recordの値がnullの時は今月の一覧を出力する
-    # Read
+def read_AttendanceRecord(event, session, work_record):
     client = session.client('dynamodb')
     table_name = 'AttendanceRecords'
     try:
@@ -186,7 +159,7 @@ def read_AttendanceRecord(event,session,work_record):
             TableName=table_name,
             KeyConditionExpression='user_id = :uid AND begins_with(work_date, :wdate)',
             ExpressionAttributeValues={
-                ':uid': {'S': 'iamuser'},
+                ':uid': {'S': work_record.sub},
                 ':wdate': {'S': search_day}
             }
         )
@@ -194,12 +167,7 @@ def read_AttendanceRecord(event,session,work_record):
         items = result.get('Items', [])
         parsed_items = [convert_dynamo_item(item) for item in items]
 
-        if parsed_items:
-            logger.info(f"[success]read:{parsed_items}")
-        else:
-            logger.info("no record")
-            parsed_items = []
-
+        logger.info(f"[success]read:{parsed_items}")
         return {
             'message': 'dbread successfully',
             'records': parsed_items
@@ -207,7 +175,7 @@ def read_AttendanceRecord(event,session,work_record):
 
     except Exception as e:
         logger.error(f"[error]read: {str(e)}")
-        return {'error': str(e)}
+        return {'message': 'dbread failed', 'error': str(e), 'records': []}
 
 def convert_dynamo_item(item):
     return {k: list(v.values())[0] for k, v in item.items()}
@@ -220,101 +188,36 @@ def format_timedelta(td):
     minutes = total_minutes % 60
     return f"{hours:02d}:{minutes:02d}"
 
-
-# 不足している日付取得
 def check_month_dates(records, year, month):
-# records が list かつ最初の要素が list なら flatten
-    # records 内の work_date を set にする
     work_dates = set()
     for r in records:
         if 'work_date' in r and r['work_date']:
             work_dates.add(r['work_date'])
-    # 指定年月の全日付を生成
     num_days = calendar.monthrange(year, month)[1]
-    all_dates = set(
-        date(year, month, day).strftime("%Y-%m-%d") for day in range(1, num_days + 1)
-    )
-    # 不足している日付を確認
+    all_dates = set(date(year, month, day).strftime("%Y-%m-%d") for day in range(1, num_days + 1))
     missing_dates = sorted(all_dates - work_dates)
-
-    return {
-        "all_present": len(missing_dates) == 0,
-        "missing_dates": missing_dates
-    }
-
+    return {"all_present": len(missing_dates) == 0, "missing_dates": missing_dates}
 
 class workrecord:
-    def __init__(self, 
-                work_date=None,
-                day_of_the_week=None,
-                work_style=None,
-                start_time=None,
-                end_time=None,
-                work_time=None,
-                break_time=None,
-                note=None):
-
-        # Work Date
+    def __init__(self, sub=None, work_date=None, day_of_the_week=None, work_style=None,
+                 start_time=None, end_time=None, work_time=None, break_time=None, note=None, submit=None):
+        self.sub = str(sub)
         self.work_date = datetime.strptime(work_date, "%Y-%m-%d") if work_date else None
-
-        # Day of the week
         self.day_of_the_week = get_weekday_abbr(self.work_date) if self.work_date else None
-
-        # work style
         if work_style:
             self.work_style = str(work_style)
         else:
-            if self.day_of_the_week in ("Sat","Sun"):
-                self.work_style = "休み"
-            else:
-                self.work_style = "出勤"
-
-        # start time
-        if self.work_style == "休み":
-            self.start_time = None
-        else:
-            self.start_time = datetime.strptime(start_time, "%H:%M").time() if start_time else time(9, 0)
-
-        # end time
-        if self.work_style == "休み":
-            self.end_time = None
-        else:
-            self.end_time = datetime.strptime(end_time, "%H:%M").time() if end_time else time(17, 30)
-
-        # break time のセット（先に設定する）
-        if self.work_style == "休み":
-            self.break_time = None    
-        else:
-            self.break_time = self.calculate_break_minutes(self.start_time, self.end_time)
-
-        # work time（timedelta型で保持）
-        if self.work_style == "休み":
-            self.work_time = None
-        else:
-            self.work_time = self.calculate_work_time()
-
-        # note
+            self.work_style = "休み" if self.day_of_the_week in ("Sat", "Sun") else "出勤"
+        self.start_time = None if self.work_style == "休み" else datetime.strptime(start_time, "%H:%M").time() if start_time else time(9, 0)
+        self.end_time = None if self.work_style == "休み" else datetime.strptime(end_time, "%H:%M").time() if end_time else time(17, 30)
+        self.break_time = None if self.work_style == "休み" else self.calculate_break_minutes(self.start_time, self.end_time)
+        self.work_time = None if self.work_style == "休み" else self.calculate_work_time()
         self.note = str(note) if note else None
+        self.submit = str(submit) if submit in ["0", "1"] else "0"
 
     def __str__(self):
-        date_str = self.work_date.strftime("%Y-%m-%d") if self.work_date else None
-        day_of_the_week_str = str(self.day_of_the_week)
-        work_style_str = str(self.work_style)
-        start_str = self.start_time.strftime("%H:%M") if self.start_time else None
-        end_str = self.end_time.strftime("%H:%M") if self.end_time else None
-        break_time_str = str(self.break_time) if self.break_time else None
-        work_time_str = str(self.work_time) if self.work_time else None
-        note_str = str(self.note)
-        return f"""Date cell: {date_str},
-                Day_of_the_week: {day_of_the_week_str},
-                Work_style: {work_style_str}
-                Start: {start_str},
-                End: {end_str},
-                Break_time {break_time_str},
-                Work_time {work_time_str},
-                Note: {note_str}"""
+        return f"Sub: {self.sub}, Date: {self.work_date.strftime('%Y-%m-%d') if self.work_date else None}, Day: {self.day_of_the_week}, Style: {self.work_style}, Start: {self.start_time}, End: {self.end_time}, Break: {self.break_time}, Work: {self.work_time}, Note: {self.note}, Submit: {self.submit}"
 
-    # ===== work time の時間計算 =====
     def calculate_work_time(self):
         try:
             start_dt = datetime.combine(date.today(), self.start_time)
@@ -326,7 +229,6 @@ class workrecord:
             print(f"Work time calculation error: {e}")
             return None
 
-    # ===== 休憩時間関係の計算 =====
     def overlap_minutes(self, start1, end1, start2, end2):
         latest_start = max(start1, start2)
         earliest_end = min(end1, end2)
@@ -335,27 +237,19 @@ class workrecord:
 
     def calculate_break_minutes(self, start_time_obj, end_time_obj):
         base_date = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
-
         start_time = datetime.combine(base_date, start_time_obj)
         end_time = datetime.combine(base_date, end_time_obj)
         if end_time < start_time:
             end_time += timedelta(days=1)
-
         total_break_minutes = 0
         for b_start, b_end in self.bread_periods():
             b_start_dt = datetime.combine(base_date, b_start)
             b_end_dt = datetime.combine(base_date, b_end)
-
-            # 終了時刻が開始時刻より小さい場合（深夜跨ぎ）
             if b_end < b_start:
                 b_end_dt += timedelta(days=1)
-
-            # 同じく必要なら b_start も補正
             if b_start_dt > b_end_dt:
                 b_start_dt += timedelta(days=1)
-
             total_break_minutes += self.overlap_minutes(start_time, end_time, b_start_dt, b_end_dt)
-
         return timedelta(minutes=total_break_minutes)
 
     def parse_time(self, tstr):
@@ -374,10 +268,7 @@ class workrecord:
 
 def check_credential(id_token):
     try:
-        payload = {
-            "idtoken": id_token,
-            "invokefunction": "Attendance Function"
-        }
+        payload = {"idtoken": id_token, "invokefunction": "Attendance Function"}
         logger.info(f"payload:{payload}")
         lambda_client = boto3.client("lambda")
         response = lambda_client.invoke(
@@ -387,24 +278,14 @@ def check_credential(id_token):
         )
         payload_str = response["Payload"].read().decode("utf-8")
         payload_dict = json.loads(payload_str)
-
-        logger.info(f"Credential response payload: {payload_dict}")
         body_str = payload_dict.get("body", "{}")
         body_dict = json.loads(body_str)
-
-        # ステータスコードチェック
         status_code = payload_dict.get("statusCode", 500)
-
         if status_code == 200 and body_dict.get("status") == "online":
-            return True
+            return {"status": "true", "sub": body_dict.get("sub"), "email": body_dict.get("email")}
         else:
             logger.info(f"Invalid credential: {body_dict.get('error', 'Unknown error')}")
-            return False
-
+            return {"status": "false"}
     except Exception as e:
         logger.info(f"check_credential error: {str(e)}")
-        return False
-
-
-# curl https://app.itononari.xyz/submit -XPOST -H "Content-Type: application/json" -d '{"work_date":"2025-07-04", "start_time":"09:00", "end_time":"18:15"}'
-
+        return {"status": "false"}

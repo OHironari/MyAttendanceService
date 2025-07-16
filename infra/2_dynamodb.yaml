@@ -47,6 +47,10 @@ Resources:
         - Key: Env
           Value: dev
 
+      TimeToLiveSpecification:
+        AttributeName: expire_at
+        Enabled: true
+
 
 Outputs:
   AttendancetblArn:

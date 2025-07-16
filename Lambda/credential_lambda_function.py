@@ -2,7 +2,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import jwt
 
@@ -46,17 +46,6 @@ def lambda_handler(event, context):
         if not idtoken:
             return {"statusCode": 401, "body": "No id_token"}
 
-        # 取得に1秒近くかかるので停止
-        # role_arn = get_role_arn_dynamo()
-        # logger.info(f"role_arn:{role_arn}")
-        # if role_arn is None or isinstance(role_arn, dict):
-        #     return response(500, {'error': 'Failed to get role arn', 'detail': role_arn})
-
-        # # assume role
-        # session=get_role(role_arn)
-        # if isinstance(session,dict) and "error" in session:
-        #     return response(500,session)
-
         jwks_url = f"https://cognito-idp.{region}.amazonaws.com/{userpoolid}/.well-known/jwks.json"
         jwks_client = jwt.PyJWKClient(jwks_url)
         signing_key = jwks_client.get_signing_key_from_jwt(idtoken)
@@ -91,37 +80,13 @@ def lambda_handler(event, context):
         else:
             return response(401,{'status':'token expired'})
         
-        return response(200, {'status': 'online'})
+        return response(200, {'status': 'online',
+                              'sub':sub,
+                              'email':email})
         
     except Exception as e:
         return response(401, {'error': str(e)})
 
-# def get_role_arn_dynamo():
-#     try:
-#         sct_mgr = boto3.client(service_name='secretsmanager',region_name='us-east-1')
-#         sct_mgr_iam_role_arn = sct_mgr.get_secret_value(
-#             SecretId=secrets_manager_arn
-#         )
-#         secret_dict= json.loads(sct_mgr_iam_role_arn['SecretString'])
-#         return secret_dict['credential_dynamo_access_role_arn']
-
-#     except Exception as e:
-#         return str(e)
-
-# def get_role(role_arn):
-#     try:
-#         sts = boto3.client('sts',region_name='ap-northeast-1')
-#         response = sts.assume_role(
-#             RoleArn=role_arn,
-#             RoleSessionName="accessdynamo",            
-#         )
-#         session = boto3.Session(aws_access_key_id=response['Credentials']['AccessKeyId'],
-#                                 aws_secret_access_key=response['Credentials']['SecretAccessKey'],
-#                                 aws_session_token=response['Credentials']['SessionToken'],
-#                                 region_name='ap-northeast-1')
-#         return session
-#     except Exception as e:
-#         return  {"error": str(e)}
     
 def response(status_code, body):
     return {
@@ -140,6 +105,10 @@ def write_AccessAndUserManagr(accessrecord):
     client = boto3.client('dynamodb')
     table_name = 'AccessAndUserManageRecord'
 
+    expire_at = int((datetime.now(timezone.utc) + timedelta(days=7)).timestamp())
+    #test 100s
+    #expire_at = int((datetime.now(timezone.utc) + timedelta(seconds=100)).timestamp())
+
     try:
     #書き込み
         response = client.put_item(
@@ -149,7 +118,8 @@ def write_AccessAndUserManagr(accessrecord):
                 'idtoken': {'S': accessrecord.idtoken},
                 'email': {'S': accessrecord.email},
                 'invokefunctionname': {'S': accessrecord.invokefunctionname},
-                'lastaccesstime': {'S': accessrecord.lastaccesstime}
+                'lastaccesstime': {'S': accessrecord.lastaccesstime},
+                'expire_at': {"N": str(expire_at)}
             }
         )
         logger.info(f"[success]write:{response}")

@@ -20,7 +20,6 @@ const form = document.querySelector(".form");
 function updateMonthTitle() {
   monthTitle.textContent = `${currentYear}年${String(currentMonth).padStart(2, "0")}月`;
 }
-
 updateMonthTitle();
 
 document.getElementById("prevMonthBtn").addEventListener("click", () => {
@@ -33,6 +32,22 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   await fetchDataAndRender();
 });
+
+// =====================
+// 共通JSONパーサ
+// =====================
+async function parseLambdaResponse(res) {
+  const raw = await res.json();
+  let parsed = raw;
+  if (typeof raw.body === "string") {
+    try {
+      parsed = JSON.parse(raw.body);
+    } catch {
+      throw new Error("parse_error");
+    }
+  }
+  return parsed;
+}
 
 async function fetchDataAndRender() {
   let idToken = localStorage.getItem("id_token");
@@ -51,6 +66,7 @@ async function fetchDataAndRender() {
     break_time: "",
     work_time: "",
     note: "",
+    style: "readonly",
     id_token: idToken
   };
 
@@ -64,20 +80,26 @@ async function fetchDataAndRender() {
       body: JSON.stringify(data)
     });
 
-    const result = await response.json();
-    if (result.error === "token expired") {
+    const result = await parseLambdaResponse(response);
+
+    if (result?.error === "token expired") {
       localStorage.removeItem("id_token");
       redirectToLogin();
       return;
     }
 
-    if (result.records) {
+    if (result && result.records && Array.isArray(result.records)) {
       renderTable(result.records);
     } else {
       tableArea.innerHTML = `<p style="color:red;">データが取得できませんでした。</p>`;
     }
   } catch (err) {
-    tableArea.innerHTML = `<p style="color:red;">通信エラー: ${err.message}</p>`;
+    if (err.message === "parse_error") {
+      tableArea.innerHTML = `<p style="color:red;">サーバー応答解析エラー</p>`;
+    } else {
+      console.error("fetch error", err);
+      tableArea.innerHTML = `<p style="color:red;">通信エラー: ${err.message}</p>`;
+    }
   }
 }
 
@@ -97,7 +119,7 @@ function renderTable(records) {
     </thead><tbody>`;
 
   let totalMinutes = 0;
-   const todayStr = new Date().toISOString().split("T")[0]; // "2025-07-15"
+  const todayStr = new Date().toISOString().split("T")[0];
 
   for (const r of records) {
     let dayClass = "";
@@ -112,11 +134,11 @@ function renderTable(records) {
       totalMinutes += h * 60 + m;
     }
 
-    // 今日の場合は highlight クラスを追加
     const todayClass = r.work_date === todayStr ? "highlight-today" : "";
+    const alreadysubmit = r.submit === "1" ? "highlight-alreadysubmit" : "";
 
     html += `
-      <tr data-date="${r.work_date}" class="${todayClass}">
+      <tr data-date="${r.work_date}" class="${todayClass} ${alreadysubmit}">
         <td>${displayDate}</td>
         <td class="${dayClass}">${r.day_of_the_week || ""}</td>
         <td>
@@ -176,6 +198,7 @@ function submitRow(button) {
   const note = row.querySelector('input[name="note"]').value;
 
   const idToken = localStorage.getItem("id_token");
+  const submit = "1";
   if (!idToken) {
     redirectToLogin();
     return;
@@ -190,6 +213,7 @@ function submitRow(button) {
     break_time,
     work_time: "",
     note,
+    submit,
     id_token: idToken
   };
 
@@ -201,18 +225,25 @@ function submitRow(button) {
     },
     body: JSON.stringify(data)
   })
-    .then(res => res.json())
-    .then(json => {
-      if (json.error === "token expired") {
+    .then(parseLambdaResponse)
+    .then(parsed => {
+      if (parsed?.error === "token expired") {
         localStorage.removeItem("id_token");
         redirectToLogin();
         return;
       }
-      alert("送信完了");
-      if (json.records) renderTable(json.records);
+      if (parsed && parsed.records && Array.isArray(parsed.records)) {
+        renderTable(parsed.records);
+      } else {
+        alert("不明なエラーが発生しました");
+      }
     })
     .catch(err => {
-      alert("送信エラー：" + err.message);
+      if (err.message === "parse_error") {
+        alert("サーバー応答解析エラー");
+      } else {
+        alert("送信エラー：" + err.message);
+      }
     });
 }
 window.submitRow = submitRow;
@@ -242,8 +273,9 @@ document.getElementById("downloadBtn").addEventListener("click", async (e) => {
       body: JSON.stringify(data)
     });
 
-    const result = await response.json();
-    if (result.error === "token expired") {
+    const result = await parseLambdaResponse(response);
+
+    if (result?.error === "token expired") {
       localStorage.removeItem("id_token");
       redirectToLogin();
       return;
