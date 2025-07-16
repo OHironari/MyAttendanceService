@@ -210,7 +210,17 @@ class workrecord:
             self.work_style = "休み" if self.day_of_the_week in ("Sat", "Sun") else "出勤"
         self.start_time = None if self.work_style == "休み" else datetime.strptime(start_time, "%H:%M").time() if start_time else time(9, 0)
         self.end_time = None if self.work_style == "休み" else datetime.strptime(end_time, "%H:%M").time() if end_time else time(17, 30)
-        self.break_time = None if self.work_style == "休み" else self.calculate_break_minutes(self.start_time, self.end_time)
+        #self.break_time = None if self.work_style == "休み" else self.calculate_break_minutes(self.start_time, self.end_time)
+        if work_style == '休み':
+            self.break_time = timedelta()
+            self.work_time = None
+        elif break_time:
+            t = datetime.strptime(break_time, "%H:%M")
+            self.break_time = timedelta(hours=t.hour, minutes=t.minute)
+        else:
+            self.break_time = self.calculate_break_minutes(self.start_time, self.end_time)
+
+        self.work_time = None if self.work_style == "休み" else self.calculate_work_time()
         self.work_time = None if self.work_style == "休み" else self.calculate_work_time()
         self.note = str(note) if note else None
         self.submit = str(submit) if submit in ["0", "1"] else "0"

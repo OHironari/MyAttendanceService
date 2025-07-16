@@ -293,6 +293,26 @@ document.getElementById("downloadBtn").addEventListener("click", async (e) => {
   }
 });
 
+// =====================
+// email 表示用関数追加
+// =====================
+function updateUserEmail() {
+  const email = localStorage.getItem("email");
+  let userEmailEl = document.getElementById("userEmail");
+  if (!userEmailEl) {
+    userEmailEl = document.createElement("div");
+    userEmailEl.id = "userEmail";
+    userEmailEl.style.position = "fixed";
+    userEmailEl.style.top = "10px";
+    userEmailEl.style.right = "20px";
+    userEmailEl.style.color = "white";
+    document.body.appendChild(userEmailEl);
+  }
+  if (email) {
+    userEmailEl.textContent = email;
+  }
+}
+
 window.onload = async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get("code");
@@ -301,8 +321,9 @@ window.onload = async () => {
     try {
       const res = await fetch(`/auth?code=${code}`, { credentials: "include" });
       const data = await res.json();
-      if (data.id_token && data.session_id) {
+      if (data.id_token && data.session_id && data.email) {
         localStorage.setItem("id_token", data.id_token);
+        localStorage.setItem("email", data.email);
         window.location.replace(redirectUri);
         return;
       } else {
@@ -318,6 +339,7 @@ window.onload = async () => {
       redirectToLogin();
     } else {
       document.body.style.display = "block";
+      updateUserEmail(); // ← ここで表示
       await fetchDataAndRender();
     }
   }

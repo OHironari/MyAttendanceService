@@ -70,11 +70,19 @@ def lambda_handler(event, context):
             InvocationType='RequestResponse',
             Payload=json.dumps(payload)
             )
+        payload_str=response["Payload"].read().decode("utf-8")
+        payload_dict=json.loads(payload_str)
+        body_str = payload_dict.get("body", "{}")
+        body_dict = json.loads(body_str)
+        email = body_dict.get("email")
+
 
     except Exception as e:
         logger.error(f"Check Credential failed: {e}")
         return {"statusCode": 500, "body": "Check Credential failed"}
 
+
+    
 
     # ここで HTML を生成
     html_body = f"""
@@ -88,7 +96,9 @@ def lambda_handler(event, context):
       <p>認証完了しました。リダイレクト中...</p>
       <script>
         const idToken = "{id_token}";
+        const email = "{email}";
         localStorage.setItem("id_token", idToken);
+        localStorage.setItem("email", email);
         window.location.href = "https://app.itononari.xyz/";
       </script>
     </body>
