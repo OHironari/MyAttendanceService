@@ -302,7 +302,7 @@ function updateUserEmail() {
   if (!userEmailEl) {
     userEmailEl = document.createElement("div");
     userEmailEl.id = "userEmail";
-    userEmailEl.style.position = "fixed";
+    userEmailEl.style.position = "absolute";
     userEmailEl.style.top = "10px";
     userEmailEl.style.right = "20px";
     userEmailEl.style.color = "white";
@@ -346,3 +346,23 @@ window.onload = async () => {
 };
 
 document.body.style.display = "none";
+
+// Google Auth
+
+document.getElementById("googleAuthBtn").addEventListener("click", () => {
+  const clientId = "939083238703-qqb8jqn1lffbak5q3m709kh1808rptq7.apps.googleusercontent.com"; // googleのOAuthクライアントID
+  const redirectUri = "https://app.itononari.xyz/gmailapi"; // Googleに設定したリダイレクトURI
+  const scope = "https://www.googleapis.com/auth/gmail.compose";
+
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth` +
+  `?client_id=${clientId}` +
+  `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+  `&response_type=code` +
+  `&scope=${encodeURIComponent(scope)}` +
+  `&access_type=offline` +
+  `&prompt=consent`; // consent を毎回表示（refresh_token取得のため）
+
+  window.open(authUrl, "_blank");
+
+});
+

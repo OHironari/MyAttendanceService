@@ -31,6 +31,13 @@ Resources:
       ParentId: !GetAtt MyApiGateway.RootResourceId
       PathPart: auth
 
+  MyGmailAPIResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ParentId: !GetAtt MyApiGateway.RootResourceId
+      PathPart: gmailapi
+
   LambdaMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -95,6 +102,26 @@ Resources:
               - "/invocations"
         PassthroughBehavior: WHEN_NO_MATCH
 
+  LambdaGmailAPIMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ResourceId: !Ref MyGmailAPIResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.Content-Type: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          !Join
+            - ''
+            - - !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/"
+              - !ImportValue GmailAPIFunctionARN
+              - "/invocations"
+        PassthroughBehavior: WHEN_NO_MATCH
+
 
   MyDomainName:
     Type: AWS::ApiGateway::DomainName
@@ -120,6 +147,7 @@ Resources:
       - LambdaMethod
       - LambdaDownloadMethod
       - LambdaAuthMethod
+      - LambdaGmailAPIMethod
     Properties:
       RestApiId: !Ref MyApiGateway
 

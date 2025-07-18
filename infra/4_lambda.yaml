@@ -2,9 +2,15 @@ Parameters:
   SecretsManagerARN:
     Type: String
     Description: Into Secret Manager ARN. You have this one at us-east-1.
+  GmailAPISecretsManagerARN:
+    Type: String
+    Description: Into Secret Manager For Gmail API ARN. You have this one at us-east-1.
   UserPoolId:
     Type: String
     Description: Into User Pool Id that published by cognito app client.(ex. ap-northeast-1.xxxxxxxx)
+  GmailClientId:
+    Type: String
+    Description: Into User Pool Id that published by google app client.(ex. 99xxxxx-apps.googleusercontent.com)
   ClientId:
     Type: String
     Description: Into Client Id that published by cognito.
@@ -16,8 +22,13 @@ Parameters:
     Type: String
     Description: Into cognito domain
     Default: auth.itononari.xyz
+  RedirectURIForGmail:
+    Type: String
+    Description: Into URI for Gmail API lambda.
+    Default: https://app.itononari.xyz/gmailapi
 
 Resources:
+  # Attendance
   PostFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -45,6 +56,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
  
+  # Dowonload
   DownloadFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -73,6 +85,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
 
+  # Authenticate 
   AuthenticateFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -106,6 +119,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
 
+  # Check Credential
   CheckCredentialFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -128,6 +142,35 @@ Resources:
         - arn:aws:lambda:ap-northeast-1:324037284373:layer:rust:1
         - arn:aws:lambda:ap-northeast-1:324037284373:layer:cryptography:6
 
+  # Gmail API
+  GmailAPIFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MyGmailAPIFunciton
+      Description: "This define the Lambda Function for Gmail API"
+      Code:
+        S3Bucket: !ImportValue S3BucketName
+        S3Key: gmailapi_lambda_function.py.zip
+      Environment:
+        Variables:
+          secrets_manager_arn: !Ref GmailAPISecretsManagerARN
+          clientid: !Ref GmailClientId
+          redirecturi: !Ref RedirectURIForGmail
+      Role: !ImportValue GmailAPIlLambdaRole
+      Runtime: "python3.13"
+      Handler: gmailapi_lambda_function.lambda_handler
+      Timeout: 10
+      Layers:
+        - arn:aws:lambda:ap-northeast-1:324037284373:layer:requests:1
+        
+
+  LambdaInvokePermissionForGmail:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GmailAPIFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+
 Outputs:
   FunctionARN:
     Value: !GetAtt PostFunction.Arn
@@ -147,4 +190,9 @@ Outputs:
     Export:
       Name: AuthFunctionARN
 
+  GmailAPIFunctionARN:
+    Value: !GetAtt GmailAPIFunction.Arn
+    Description: Return Gmail API Function arn
+    Export:
+      Name: GmailAPIFunctionARN
   

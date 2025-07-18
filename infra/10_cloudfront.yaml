@@ -189,10 +189,26 @@ Resources:
             ResponseHeadersPolicyId: !Ref AuthResponsePolicy
             OriginRequestPolicyId: !Ref MyOriginRequestPolicy
 
+          # For Gmail API
+          - PathPattern: /gmailapi*
+            TargetOriginId: APIOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            CachePolicyId: !Ref GetCachePolicy
+            ResponseHeadersPolicyId: !Ref AuthResponsePolicy
+            OriginRequestPolicyId: !Ref MyOriginRequestPolicy
+
         ViewerCertificate:
           AcmCertificateArn: !Ref ACMCertificateArn
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
+
 
   MyResponsePolicy:
     Type: AWS::CloudFront::ResponseHeadersPolicy

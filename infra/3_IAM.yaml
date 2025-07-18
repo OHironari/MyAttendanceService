@@ -2,6 +2,10 @@ Parameters:
   SecretsManagerARN:
     Type: String
     Description: Into Secret Manager ARN. You have this one at us-east-1.
+  GmailSecretsManagerARN:
+    Type: String
+    Description: Into Secret Manager ARN for Gmail API. You have this one at us-east-1.
+
 
 Resources:
   # For Assume Role
@@ -197,7 +201,38 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-    
+
+  # Gmail API FunctionからSecrets Managerへのアクセスポリシー
+  GmailAPIToSecretsManagerAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: GmailAPIToSecretsManagerAccessPolicy
+      Roles: 
+        - !Ref GmailAPIlLambdaRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'secretsmanager:GetSecretValue'
+            Resource:
+              - !Ref GmailSecretsManagerARN
+
+  # Gmail API Role
+  GmailAPIlLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
 
 Outputs:
   S3AccessRole:
@@ -220,5 +255,10 @@ Outputs:
     Description: For Credential Lambda IAM ROLE
     Export:
       Name: CredentialLambdaRole
+  GmailAPIlLambdaRole:
+    Value: !GetAtt GmailAPIlLambdaRole.Arn
+    Description: For Gmail API Lambda IAM ROLE
+    Export:
+      Name: GmailAPIlLambdaRole
 
 

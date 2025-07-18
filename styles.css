@@ -77,6 +77,41 @@ h2 {
   background: #ec8111;
 }
 
+.assgoogle_button {
+  background: #f4f3f5;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #000;
+  line-height: 40px;
+  margin: 1rem 0.5rem;
+  padding: 0.5rem 0.5rem;
+  top: 0.5rem;
+  left: 0.5rem;
+  position: absolute;         /* ←スクロールしても固定 */
+  display: flex;           /* アイコンとテキスト横並び */
+  align-items: center;     /* 縦位置を中央揃え */
+  text-decoration: none;
+  padding: 10px 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  font-size: 16px;
+  z-index: 1000;
+}
+
+.assgoogle_button:hover {
+  background: #065b7a;
+  color: #ffffff;
+  height: inherit;
+}
+
+.assgoogle_button img {
+  padding: 0px;
+}
+
+.download_button:hover {
+  background-color:  #03e53b;
+}
+
 a button {
   display: inline-block;
   font-size: 1.1rem;

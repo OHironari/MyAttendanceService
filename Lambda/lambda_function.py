@@ -223,7 +223,10 @@ class workrecord:
         self.work_time = None if self.work_style == "休み" else self.calculate_work_time()
         self.work_time = None if self.work_style == "休み" else self.calculate_work_time()
         self.note = str(note) if note else None
-        self.submit = str(submit) if submit in ["0", "1"] else "0"
+        if datetime.strptime(work_date,"%Y-%m-%d") > datetime.now():
+            self.submit = "0"
+        else:
+            self.submit = str(submit) if submit in ["0", "1"] else "0"
 
     def __str__(self):
         return f"Sub: {self.sub}, Date: {self.work_date.strftime('%Y-%m-%d') if self.work_date else None}, Day: {self.day_of_the_week}, Style: {self.work_style}, Start: {self.start_time}, End: {self.end_time}, Break: {self.break_time}, Work: {self.work_time}, Note: {self.note}, Submit: {self.submit}"

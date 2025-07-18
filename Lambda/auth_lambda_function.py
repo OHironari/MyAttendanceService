@@ -16,7 +16,6 @@ cognitodomain = os.getenv("cognitodomain")
 region = "ap-northeast-1"
 
 def lambda_handler(event, context):
-    logger.info(event)
     params = event.get("queryStringParameters") or {}
     code = params.get("code")
     if not code:
