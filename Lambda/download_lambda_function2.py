@@ -1,5 +1,6 @@
 import boto3
 import openpyxl
+from openpyxl.styles import Alignment, PatternFill
 import io
 import os
 import logging
@@ -61,7 +62,8 @@ def lambda_handler(event, context):
         return response(200, {"url": urls})
 
     except Exception as e:
-        return (500, {'error': str(e)})
+        logger.info(f"lambda_hander_error:{str(e)}")
+        return response(500, {'error': str(e)})
 
 def get_role_arn_s3():
     try:
@@ -106,6 +108,7 @@ def get_role(role_arn):
         return {"error": str(e)}
 
 def response(status_code, body_dict):
+    logger.info(f"status_code:{status_code},body_dict:{body_dict}")
     return {
         "statusCode": status_code,
         "headers": {
@@ -167,13 +170,11 @@ def get_attendance_list(body,session):
             "message": parsed_body.get("message", "Success"),
             "records": records
         }
-    
+
     except Exception as e:
         logger.info(f"error:{str(e)}")
-        return {
-            "statusCode": 500,
-            "body": str(e)
-        }
+        raise
+        
 
 def write_list_to_excel(username,result,session):
     try:
@@ -185,48 +186,107 @@ def write_list_to_excel(username,result,session):
 
         # Excel 読み込み
         workbook = openpyxl.load_workbook(in_mem_file)
-        sheet = workbook.active
-        start_row = 8  # 書き込み開始行（テンプレートに合わせて適宜変更）
 
-        #上部
-        #年度
-        sheet["B5"] = datetime.strptime(result["records"][0]["work_date"].replace("-", "/"), "%Y/%m/%d")
-        sheet["I5"] = username
-        #指名
+        # 日付の定義
+        date_obj = datetime.strptime(result["records"][0]["work_date"], "%Y-%m-%d")
+        year = date_obj.strftime("%Y")
+        month = date_obj.strftime("%m")
+        day = date_obj.strftime("%d")
+
+        #===============
+        # 末締め作業実績深夜つき シート編集
+        #===============
+        sheet = workbook['末締め作業実績深夜つき']
+        start_row = 8  # 書き込み開始行（テンプレートに合わせて適宜変更）
+        sheet["H6"] = datetime.strptime(result["records"][0]["work_date"].replace("-", "/"), "%Y/%m/%d")
+        sheet["T5"] = username
 
         #一覧部分
         for idx, record in enumerate(result["records"]):
             row = start_row + idx
 
             # 例として以下のカラムに書く
-            sheet[f"B{row}"] = record.get("work_date", "")
-            sheet[f"C{row}"] = record.get("day_of_the_week", "")
-            sheet[f"D{row}"] = record.get("work_style", "")
-            sheet[f"E{row}"] = datetime.strptime(record.get("start_time", ""),"%H:%M").time() if record.get("start_time", "") else None
-            sheet[f"F{row}"] = datetime.strptime(record.get("end_time", ""),"%H:%M").time() if record.get("end_time", "") else None
-            sheet[f"G{row}"] = datetime.strptime(record.get("break_time", ""),"%H:%M").time() if record.get("break_time", "") else None
-            sheet[f"H{row}"] = datetime.strptime(record.get("work_time", ""),"%H:%M").time() if record.get("work_time", "") else None
-            sheet[f"I{row}"] = record.get("note", "")
+            #sheet[f"A{row}"] = record.get("work_date", "")
+            #sheet[f"Z{row}"] = record.get("day_of_the_week", "")
+            sheet[f"V{row}"] = "I区" if record.get("work_style", "") == "出勤" else None
+            sheet[f"N{row}"] = datetime.strptime(record.get("start_time", ""),"%H:%M").time() if record.get("start_time", "") else None
+            sheet[f"P{row}"] = datetime.strptime(record.get("end_time", ""),"%H:%M").time() if record.get("end_time", "") else None
+            #sheet[f"AD{row}"] = datetime.strptime(record.get("break_time", ""),"%H:%M").time() if record.get("break_time", "") else None
+            #sheet[f"AE{row}"] = datetime.strptime(record.get("work_time", ""),"%H:%M").time() if record.get("work_time", "") else None
+            sheet[f"S{row}"] = record.get("note", "")
+            if record.get("work_style", "") == "休み":
+                cell = sheet[f"L{row}"]
+                cell.fill = PatternFill(fill_type='solid', start_color='FF6900', end_color='FF6900')
 
         # 書き込み後、ファイルをバイトデータに保存
         out_mem_file = io.BytesIO()
         workbook.save(out_mem_file)
         out_mem_file.seek(0)  # 先頭に戻す
 
-        # putobject
-        date_obj = datetime.strptime(result["records"][0]["work_date"], "%Y-%m-%d")
-        formatted = date_obj.strftime("%Y%m")
+        #===============
+        # 近地出張旅費 シート編集
+        #===============
+        sheet = workbook['近地出張旅費']
 
+        title_str=f"近地等出張旅費計算書({year}年{month}月)"
+        request_date = f"依頼日　　　{year}年　　 {month}月{day}日"
+
+        sheet["B3"] = title_str
+        sheet["J7"] = username
+        sheet["I5"] = request_date
+        cell = sheet["B3"]
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        # 書き込み後、ファイルをバイトデータに保存
+        out_mem_file = io.BytesIO()
+        workbook.save(out_mem_file)
+        out_mem_file.seek(0)  # 先頭に戻す
+
+        #===============
+        # 業務完了報告書 シート編集
+        #===============
+        sheet = workbook['業務完了報告書']
+        logger.info(f"sheet:{sheet}")
+
+        # start date オブジェクトに変換
+        start_date = datetime.strptime(result["records"][0]["work_date"], "%Y-%m-%d")
+        start_year  = start_date.strftime("%Y")
+        start_month = start_date.strftime("%m")
+        start_day   = start_date.strftime("%d")
+
+        # end date オブジェクトに変換
+        end_date = datetime.strptime(result["records"][-1]["work_date"], "%Y-%m-%d")
+        end_year  = end_date.strftime("%Y")
+        end_month = end_date.strftime("%m")
+        end_day   = end_date.strftime("%d")
+
+        term_str = f"{start_year}年{start_month}月{start_day}日　〜　{end_year}年{end_month}月{end_day}日"
+
+        logger.info(f"term_str{term_str}")
+
+        sheet["N8"] = f"報告者：{username}"
+        sheet["N4"] = end_year
+        sheet["Q4"] = end_month
+        sheet["S4"] = end_day
+        sheet["C14"] = term_str
+        sheet["F50"] = datetime.strptime(result["records"][-1]["work_date"].replace("-", "/"), "%Y/%m/%d")
+
+        # 書き込み後、ファイルをバイトデータに保存
+        out_mem_file = io.BytesIO()
+        workbook.save(out_mem_file)
+        out_mem_file.seek(0)  # 先頭に戻す
+
+        formatted = date_obj.strftime("%Y%m")
         s3_client.put_object(
             Bucket=bucket_name,
-            Key=f"attendance/files/downloads/勤務表_{username}_{formatted}.xlsx",
+            Key=f"attendance/files/downloads/作業実績表_{username}_{formatted}.xlsx",
             Body=out_mem_file.getvalue()
         )
 
         # 署名付きURLの発行
         url = s3_client.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": bucket_name, "Key": f"attendance/files/downloads/勤務表_{username}_{formatted}.xlsx"},
+                Params={"Bucket": bucket_name, "Key": f"attendance/files/downloads/作業実績表_{username}_{formatted}.xlsx"},
                 ExpiresIn=3600
             )
         
@@ -234,14 +294,11 @@ def write_list_to_excel(username,result,session):
 
     except Exception as e:
         logger.info(f"error:{str(e)}")
-        return {
-            "statusCode": 500,
-            "body": str(e)
-        }    
+        raise
 
 def check_credential(id_token):
     try:
-        payload = {"idtoken": id_token, "invokefunction": "Download Function"}
+        payload = {"idtoken": id_token, "invokefunction": "Download Function2"}
         logger.info(f"payload:{payload}")
         lambda_client = boto3.client("lambda")
         response = lambda_client.invoke(

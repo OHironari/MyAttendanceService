@@ -102,7 +102,7 @@ def get_role(role_arn):
             aws_secret_access_key=response['Credentials']['SecretAccessKey'],
             aws_session_token=response['Credentials']['SessionToken'],
             region_name='ap-northeast-1'
-        )
+        )   
         return session
     except Exception as e:
         return {"error": str(e)}
@@ -208,9 +208,10 @@ class workrecord:
             self.work_style = str(work_style)
         else:
             self.work_style = "休み" if self.day_of_the_week in ("Sat", "Sun") else "出勤"
-        self.start_time = None if self.work_style == "休み" else datetime.strptime(start_time, "%H:%M").time() if start_time else time(9, 0)
-        self.end_time = None if self.work_style == "休み" else datetime.strptime(end_time, "%H:%M").time() if end_time else time(17, 30)
-        #self.break_time = None if self.work_style == "休み" else self.calculate_break_minutes(self.start_time, self.end_time)
+
+        # 修正例
+        self.start_time = self.ensure_time(start_time) if start_time else time(9, 0)
+        self.end_time = self.ensure_time(end_time) if end_time else time(17, 30)        #self.break_time = None if self.work_style == "休み" else self.calculate_break_minutes(self.start_time, self.end_time)
         if work_style == '休み':
             self.break_time = timedelta()
             self.work_time = None
@@ -220,7 +221,6 @@ class workrecord:
         else:
             self.break_time = self.calculate_break_minutes(self.start_time, self.end_time)
 
-        self.work_time = None if self.work_style == "休み" else self.calculate_work_time()
         self.work_time = None if self.work_style == "休み" else self.calculate_work_time()
         self.note = str(note) if note else None
         if datetime.strptime(work_date,"%Y-%m-%d") > datetime.now():
@@ -241,6 +241,14 @@ class workrecord:
         except Exception as e:
             print(f"Work time calculation error: {e}")
             return None
+        
+    def ensure_time(t):
+        if isinstance(t, time):
+            return t
+        if isinstance(t, str):
+            return datetime.strptime(t, "%H:%M").time()
+        return None
+
 
     def overlap_minutes(self, start1, end1, start2, end2):
         latest_start = max(start1, start2)

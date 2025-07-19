@@ -264,32 +264,56 @@ document.getElementById("downloadBtn").addEventListener("click", async (e) => {
   };
 
   try {
-    const response = await fetch("/download", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`
-      },
-      body: JSON.stringify(data)
-    });
+    const responses = await Promise.all([
+      fetch("/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify(data)
+      }),
+      fetch("/download2", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify(data)
+      })
+    ]);
 
-    const result = await parseLambdaResponse(response);
+    // それぞれのレスポンスを処理
+const results = await Promise.all(responses.map(async (res, i) => {
+  const parsed = await parseLambdaResponse(res);
+  if (parsed?.error === "token expired") {
+    localStorage.removeItem("id_token");
+    redirectToLogin();
+    throw new Error("トークンの有効期限が切れました");
+  }
+  if (!parsed?.url) {
+    throw new Error(`ファイル${i + 1}のURLが返されませんでした`);
+  }
+  return parsed.url;
+}));
 
-    if (result?.error === "token expired") {
-      localStorage.removeItem("id_token");
-      redirectToLogin();
-      return;
-    }
+    // 署名付きURLのリンクを使ってダウンロード開始
+for (const url of results) {
+  const a = document.createElement("a");
+  a.href = url;
+  const filename = decodeURIComponent(url.split('/').pop().split('?')[0]);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 
-    const a = document.createElement("a");
-    a.href = result.url;
-    a.download = "";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  // 連続ダウンロードによるブロックを避ける
+  await new Promise(resolve => setTimeout(resolve, 500));
+}
 
   } catch (err) {
-    alert("エラー: " + err.message);
+    console.error("ダウンロードエラー:", err);
+    alert("ダウンロード中にエラーが発生しました:\n" + err.message);
   }
 });
 

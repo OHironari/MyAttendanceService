@@ -24,6 +24,13 @@ Resources:
       ParentId: !GetAtt MyApiGateway.RootResourceId
       PathPart: download
 
+  MyDownload2Resource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ParentId: !GetAtt MyApiGateway.RootResourceId
+      PathPart: download2
+
   MyAuthResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -77,6 +84,28 @@ Resources:
             - ''
             - - !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/"
               - !ImportValue DownloadFunctionARN
+              - "/invocations"
+        # RequestParameters:
+          # integration.request.header.Content-Type: "'application/json'" 
+        PassthroughBehavior: WHEN_NO_MATCH
+
+  LambdaDownload2Method:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref MyApiGateway
+      ResourceId: !Ref MyDownload2Resource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.Content-Type: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          !Join
+            - ''
+            - - !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/"
+              - !ImportValue DownloadFunction2ARN
               - "/invocations"
         # RequestParameters:
           # integration.request.header.Content-Type: "'application/json'" 
@@ -146,6 +175,7 @@ Resources:
     DependsOn: 
       - LambdaMethod
       - LambdaDownloadMethod
+      - LambdaDownload2Method
       - LambdaAuthMethod
       - LambdaGmailAPIMethod
     Properties:
