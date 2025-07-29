@@ -209,9 +209,13 @@ class workrecord:
         else:
             self.work_style = "休み" if self.day_of_the_week in ("Sat", "Sun") else "出勤"
 
-        # 修正例
-        self.start_time = self.ensure_time(start_time) if start_time else time(9, 0)
-        self.end_time = self.ensure_time(end_time) if end_time else time(17, 30)        #self.break_time = None if self.work_style == "休み" else self.calculate_break_minutes(self.start_time, self.end_time)
+        if self.work_style == "休み":
+            self.start_time = None
+            self.end_time = None
+        else:
+            self.start_time = self.ensure_time(start_time) if start_time else time(9, 0)
+            self.end_time = self.ensure_time(end_time) if end_time else time(17, 30)
+                
         if work_style == '休み':
             self.break_time = timedelta()
             self.work_time = None
@@ -242,13 +246,12 @@ class workrecord:
             print(f"Work time calculation error: {e}")
             return None
         
-    def ensure_time(t):
+    def ensure_time(self, t):
         if isinstance(t, time):
-            return t
+            return t.replace(second=0, microsecond=0)
         if isinstance(t, str):
-            return datetime.strptime(t, "%H:%M").time()
+            return datetime.strptime(t, "%H:%M").time().replace(second=0, microsecond=0)
         return None
-
 
     def overlap_minutes(self, start1, end1, start2, end2):
         latest_start = max(start1, start2)

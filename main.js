@@ -119,8 +119,13 @@ function renderTable(records) {
     </thead><tbody>`;
 
   let totalMinutes = 0;
-  const todayStr = new Date().toISOString().split("T")[0];
-
+  // const todayStr = new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0"); // 月は0始まり
+  const day = String(now.getDate()).padStart(2, "0");
+  const todayStr =  `${year}-${month}-${day}`;
+  
   for (const r of records) {
     let dayClass = "";
     if (r.day_of_the_week === "Sat") dayClass = "sat";
