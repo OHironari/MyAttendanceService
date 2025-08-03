@@ -6,10 +6,10 @@
 resource "aws_route53_record" "app" {
   zone_id = var.host_zone
   name    = "${var.environment}.app.${var.domain}"
-  type    = "A"
+  type    = "CNAME"
   ttl     = 300
   # dummy
-  records = ["192.9.212.200"]
+  records = [aws_lb.alb.dns_name]
 }
 
 # resource "aws_route53_record" "auth" {

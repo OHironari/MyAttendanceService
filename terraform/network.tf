@@ -153,6 +153,15 @@ resource "aws_security_group_rule" "anywhere_in_80_lb" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
+resource "aws_security_group_rule" "anywhere_in_4343_lb" {
+  security_group_id = aws_security_group.my-app-ms-lb-sg.id
+  type              = "ingress"
+  protocol          = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
 resource "aws_security_group_rule" "anywhere_eg_lb" {
   security_group_id = aws_security_group.my-app-ms-lb-sg.id
   type              = "egress"
@@ -193,6 +202,38 @@ resource "aws_security_group_rule" "anywhere_eg_endpoint" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
+#Security Group for Attendance Service
+resource "aws_security_group" "attendance-service-sg" {
+  name        = "${var.project}-${var.environment}-attendance-service-sg"
+  description = "${var.project}-${var.environment}-attendance-service-sg"
+  vpc_id      = aws_vpc.vpc.id
+  tags = {
+    Name    = "${var.project}-${var.environment}-attendance-service-sg"
+    Project = var.project
+    Env     = var.environment
+  }
+}
+
+resource "aws_security_group_rule" "anywhere_in_80_attendance_service" {
+  security_group_id = aws_security_group.attendance-service-sg.id
+  type              = "ingress"
+  protocol          = "tcp"
+  from_port         = 80
+  to_port           = 80
+  source_security_group_id = aws_security_group.my-app-ms-lb-sg.id
+}
+
+resource "aws_security_group_rule" "anywhere_eg_product_service" {
+  security_group_id = aws_security_group.attendance-service-sg.id
+  type              = "egress"
+  protocol          = "-1"
+  from_port         = 0
+  to_port           = 0
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+
+
 
 # ----------------------------------
 # Application Load Balancer
@@ -211,7 +252,7 @@ resource "aws_lb" "alb" {
   depends_on = [ aws_lb_target_group.alb_target_group_for_attendance]
 }
 
-resource "aws_lb_listener" "alb_listener" {
+resource "aws_lb_listener" "alb_listener80" {
   load_balancer_arn = aws_lb.alb.arn
   port              = 80
   protocol          = "HTTP"
@@ -231,8 +272,8 @@ resource "aws_lb_listener" "alb_listener" {
   depends_on = [ aws_lb_target_group.alb_target_group_for_attendance ]
 }
 
-resource "aws_lb_listener_rule" "attendance_rule" {
-  listener_arn = aws_lb_listener.alb_listener.arn
+resource "aws_lb_listener_rule" "attendance_rule80" {
+  listener_arn = aws_lb_listener.alb_listener80.arn
   priority     = 2
 
   action {
@@ -242,27 +283,74 @@ resource "aws_lb_listener_rule" "attendance_rule" {
 
   condition {
     path_pattern {
-      values = ["/api/attendance/*"]
+      values = ["/attendance*", "/attendance/*"]
     }
   }
 }
 
+resource "aws_lb_listener" "alb_listener443" {
+  load_balancer_arn = aws_lb.alb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = aws_acm_certificate.app.arn
+  default_action {
+    type="forward"
+    forward{
+      # target_group {
+      #   arn=aws_lb_target_group.alb_target_group_for_order.arn
+      #   weight = 50
+      # }
+      target_group {
+        arn=aws_lb_target_group.alb_target_group_for_attendance.arn
+        weight = 50
+      }
+    }
+  }
+  depends_on = [ aws_lb_target_group.alb_target_group_for_attendance ]
+}
+
+resource "aws_lb_listener_rule" "attendance_rule443" {
+  listener_arn = aws_lb_listener.alb_listener443.arn
+  priority     = 2
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.alb_target_group_for_attendance.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/attendance*", "/attendance/*"]
+    }
+  }
+}
+
+# ----------------------------------
+# Cloud Map
+# ----------------------------------
+
+resource "aws_service_discovery_private_dns_namespace" "cluster_dns" {
+  name        = "${var.project}-${var.environment}-CloudMap"
+  vpc         = aws_vpc.vpc.id
+  description = "Private namespace for service discovery"
+}
 
 # ----------------------------------
 # target group
 # ----------------------------------
 
-#target group for product
+#target group for attendance
 resource "aws_lb_target_group" "alb_target_group_for_attendance" {
-  name     = "${var.project}-${environment}-attendance-tg"
-  port     = 8080
+  name     = "${var.project}-${var.environment}-tg"
+  port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.vpc.id
   target_type = "ip"
 
   health_check {
     protocol = "HTTP"
-    path="/api/attendance/monitor/health"
+    path="/"
   }
 
   tags = {
@@ -314,7 +402,7 @@ resource "aws_vpc_endpoint" "my-ms-logs" {
   vpc_endpoint_type = "Interface"
   private_dns_enabled = true
 
-  subnet_ids = [aws_subnet.private_subnet_a.id,aws_subnet.private_subnet_.id]
+  subnet_ids = [aws_subnet.private_subnet_a.id,aws_subnet.private_subnet_c.id]
   security_group_ids = [aws_security_group.my-app-ms-endpoint-sg.id,]
 }
 
