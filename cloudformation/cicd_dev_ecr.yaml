@@ -1,0 +1,53 @@
+# ECRはCloudFomationで作る
+Parameters:
+  Project:
+    Type: String
+    Default: "attendance-service"
+  Environment:
+    Type: String
+    Default: "dev"
+
+Resources:
+  MyRepository: 
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName:  !Sub "${Project}${Environment}ecr"
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:PutImage"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:UploadLayerPart"
+              - "ecr:CompleteLayerUpload"
+
+  AttendanceRepository: 
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName:  !Sub "attendance${Project}${Environment}ecr"
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:PutImage"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:UploadLayerPart"
+              - "ecr:CompleteLayerUpload"
