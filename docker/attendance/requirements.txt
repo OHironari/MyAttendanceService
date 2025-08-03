@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+boto3
+python-dotenv
+logging
+datetime
+urllib.parse
+json
+os
+dotenv
+calendar
+
+

@@ -202,20 +202,20 @@ resource "aws_security_group_rule" "anywhere_eg_endpoint" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-#Security Group for Attendance Service
-resource "aws_security_group" "attendance-service-sg" {
-  name        = "${var.project}-${var.environment}-attendance-service-sg"
-  description = "${var.project}-${var.environment}-attendance-service-sg"
+#Security Group for Web Service
+resource "aws_security_group" "web-service-sg" {
+  name        = "${var.project}-${var.environment}-web-service-sg"
+  description = "${var.project}-${var.environment}-web-service-sg"
   vpc_id      = aws_vpc.vpc.id
   tags = {
-    Name    = "${var.project}-${var.environment}-attendance-service-sg"
+    Name    = "${var.project}-${var.environment}-web-service-sg"
     Project = var.project
     Env     = var.environment
   }
 }
 
-resource "aws_security_group_rule" "anywhere_in_80_attendance_service" {
-  security_group_id = aws_security_group.attendance-service-sg.id
+resource "aws_security_group_rule" "anywhere_in_80_web_service" {
+  security_group_id = aws_security_group.web-service-sg.id
   type              = "ingress"
   protocol          = "tcp"
   from_port         = 80
@@ -224,7 +224,7 @@ resource "aws_security_group_rule" "anywhere_in_80_attendance_service" {
 }
 
 resource "aws_security_group_rule" "anywhere_eg_product_service" {
-  security_group_id = aws_security_group.attendance-service-sg.id
+  security_group_id = aws_security_group.web-service-sg.id
   type              = "egress"
   protocol          = "-1"
   from_port         = 0
@@ -249,7 +249,7 @@ resource "aws_lb" "alb" {
     aws_subnet.public_subnet_a.id,
     aws_subnet.public_subnet_c.id
   ]
-  depends_on = [ aws_lb_target_group.alb_target_group_for_attendance]
+  depends_on = [ aws_lb_target_group.alb_target_group_for_web]
 }
 
 resource "aws_lb_listener" "alb_listener80" {
@@ -264,21 +264,21 @@ resource "aws_lb_listener" "alb_listener80" {
       #   weight = 50
       # }
       target_group {
-        arn=aws_lb_target_group.alb_target_group_for_attendance.arn
+        arn=aws_lb_target_group.alb_target_group_for_web.arn
         weight = 50
       }
     }
   }
-  depends_on = [ aws_lb_target_group.alb_target_group_for_attendance ]
+  depends_on = [ aws_lb_target_group.alb_target_group_for_web ]
 }
 
-resource "aws_lb_listener_rule" "attendance_rule80" {
+resource "aws_lb_listener_rule" "web_rule80" {
   listener_arn = aws_lb_listener.alb_listener80.arn
   priority     = 2
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.alb_target_group_for_attendance.arn
+    target_group_arn = aws_lb_target_group.alb_target_group_for_web.arn
   }
 
   condition {
@@ -302,21 +302,21 @@ resource "aws_lb_listener" "alb_listener443" {
       #   weight = 50
       # }
       target_group {
-        arn=aws_lb_target_group.alb_target_group_for_attendance.arn
+        arn=aws_lb_target_group.alb_target_group_for_web.arn
         weight = 50
       }
     }
   }
-  depends_on = [ aws_lb_target_group.alb_target_group_for_attendance ]
+  depends_on = [ aws_lb_target_group.alb_target_group_for_web ]
 }
 
-resource "aws_lb_listener_rule" "attendance_rule443" {
+resource "aws_lb_listener_rule" "web_rule443" {
   listener_arn = aws_lb_listener.alb_listener443.arn
   priority     = 2
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.alb_target_group_for_attendance.arn
+    target_group_arn = aws_lb_target_group.alb_target_group_for_web.arn
   }
 
   condition {
@@ -340,8 +340,8 @@ resource "aws_service_discovery_private_dns_namespace" "cluster_dns" {
 # target group
 # ----------------------------------
 
-#target group for attendance
-resource "aws_lb_target_group" "alb_target_group_for_attendance" {
+#target group for web
+resource "aws_lb_target_group" "alb_target_group_for_web" {
   name     = "${var.project}-${var.environment}-tg"
   port     = 80
   protocol = "HTTP"
@@ -354,7 +354,7 @@ resource "aws_lb_target_group" "alb_target_group_for_attendance" {
   }
 
   tags = {
-    Name    = "${var.project}-${var.environment}-app-attendance-tg"
+    Name    = "${var.project}-${var.environment}-app-web-tg"
     Project = var.project
     Env     = var.environment
   }
