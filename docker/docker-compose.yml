@@ -1,11 +1,11 @@
-version: '3.9'
+
 
 services:
   attendance:
     container_name: attendance
     build: ./attendance
     ports:
-      - '8080:8080'
+      - '8080:80'
 
   # order:
   #   container_name: order

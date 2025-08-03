@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Attendance App</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+</head>
+<body>
+  <div id="userEmail" style="position: absolute; top: 10px; right: 20px; color: white; font-size: 14px;"></div>
+  <a class="assgoogle_button" id="googleAuthBtn">
+    <img src="accgoogle.ico">
+    Google と連携する
+  </a>
+  <h1 class="form_title">勤務表</h1>
+
+  <div class="button-row">
+    <form class="form" style="display:inline;">
+      <button class="form_button" type="submit">一覧表示</button>
+    </form>
+    <button class="download_button" id="downloadBtn" type="button">
+      勤怠データをダウンロード
+    </button>
+  </div>
+
+  <div class="month-nav">
+    <button id="prevMonthBtn" type="button">←前月</button>
+    <h2 id="monthTitle">今月の勤怠一覧</h2>
+    <button id="nextMonthBtn" type="button">翌月→</button>
+  </div>
+
+  <div id="totalWorkTime" style="background:#065b7a; color:white; text-align:center; padding:10px; border-radius:8px; margin:10px 0;">
+    実働合計：00:00
+  </div>
+
+  <div id="workTableArea"></div>
+
+  <script src="main.js"></script>
+</body>
+</html>
